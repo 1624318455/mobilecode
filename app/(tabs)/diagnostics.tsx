@@ -69,7 +69,7 @@ export default function DiagnosticsScreen() {
         </Text>
         {servers.length === 0 && (
           <View
-            className="rounded-2xl p-4 mb-4"
+            className="rounded-[28px] p-4 mb-4"
             style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
           >
             <Text
@@ -80,7 +80,7 @@ export default function DiagnosticsScreen() {
             </Text>
             <Pressable
               onPress={() => router.push("/server/pair")}
-              className="mt-3 rounded-xl py-3 items-center"
+              className="mt-3 rounded-[28px] py-3 items-center"
               style={{ backgroundColor: theme.colors.primary }}
             >
               <Text
@@ -103,7 +103,7 @@ export default function DiagnosticsScreen() {
           return (
             <View
               key={server.id}
-              className="rounded-2xl p-4 mb-3"
+              className="rounded-[28px] p-4 mb-3"
               style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
             >
               <View className="flex-row items-center">
@@ -156,7 +156,7 @@ export default function DiagnosticsScreen() {
           {t("diagnostics.wsTitle")}
         </Text>
         <View
-          className="rounded-2xl p-4 mb-4"
+          className="rounded-[28px] p-4 mb-4"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           {blockedCount === 0 && allowedPaths.length === 0 && (
@@ -194,7 +194,7 @@ export default function DiagnosticsScreen() {
                 </View>
                 <Pressable
                   onPress={() => allowPath(rule.path)}
-                  className="rounded-lg px-3 py-1.5"
+                  className="rounded-[28px] px-3 py-1.5"
                   style={{ backgroundColor: theme.colors.primary }}
                 >
                   <Text
@@ -233,7 +233,7 @@ export default function DiagnosticsScreen() {
               </View>
               <Pressable
                 onPress={() => removePath(path)}
-                className="rounded-lg px-3 py-1.5"
+                className="rounded-[28px] px-3 py-1.5"
               >
                 <Text
                   className="text-sm font-medium"
@@ -248,7 +248,7 @@ export default function DiagnosticsScreen() {
 
         <Pressable
           onPress={handleCopyReport}
-          className="rounded-xl py-3 items-center"
+          className="rounded-[28px] py-3 items-center"
           style={{ backgroundColor: theme.colors.secondaryContainer }}
         >
           <Text

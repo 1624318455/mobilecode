@@ -69,7 +69,7 @@ export default function SettingsScreen() {
       <View className="p-4">
         {/* App Info */}
         <View
-          className="rounded-2xl p-4 mb-4"
+          className="rounded-[28px] p-4 mb-4"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           <View className="flex-row items-center mb-3">
@@ -109,7 +109,7 @@ export default function SettingsScreen() {
 
         {/* Stats */}
         <View
-          className="rounded-2xl p-4 mb-4"
+          className="rounded-[28px] p-4 mb-4"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           <Text
@@ -163,7 +163,7 @@ export default function SettingsScreen() {
 
         {/* Startup */}
         <View
-          className="rounded-2xl p-4 mb-4"
+          className="rounded-[28px] p-4 mb-4"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           <Text
@@ -234,7 +234,7 @@ export default function SettingsScreen() {
 
         {/* Language */}
         <View
-          className="rounded-2xl p-4 mb-4"
+          className="rounded-[28px] p-4 mb-4"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           <Text
@@ -282,7 +282,7 @@ export default function SettingsScreen() {
 
         {/* Links */}
         <View
-          className="rounded-2xl p-4 mb-4"
+          className="rounded-[28px] p-4 mb-4"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           <Text
@@ -310,7 +310,7 @@ export default function SettingsScreen() {
 
         {/* Danger Zone */}
         <View
-          className="rounded-2xl p-4"
+          className="rounded-[28px] p-4"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           <Text

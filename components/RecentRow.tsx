@@ -31,8 +31,8 @@ export const RecentRow = memo(function RecentRow({ item, index, animate = true }
     <SignatureEntrance index={index} animate={animate}>
       <SignatureCard onPress={handlePress} style={{ padding: 16, marginBottom: 12 }}>
         <View className="flex-row items-center">
-          <View
-            className="w-10 h-10 rounded-lg items-center justify-center mr-3"
+            <View
+              className="w-10 h-10 rounded-xl items-center justify-center mr-3"
             style={{
               backgroundColor:
                 item.projectIcon?.color || theme.colors.secondaryContainer,

@@ -132,7 +132,7 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
       className="mx-4 mb-3 overflow-hidden"
       style={{
         backgroundColor: theme.colors.secondaryContainer,
-        borderRadius: 20,
+        borderRadius: 28,
       }}
     >
       {/* Header */}
@@ -178,7 +178,7 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
                   key={option.label}
                   onPress={() => toggleOption(qi, option.label)}
                   disabled={isPending}
-                  className="px-3 py-2.5 rounded-xl"
+                  className="px-3 py-2.5 rounded-[28px]"
                   style={
                     isSelected
                       ? {
@@ -227,7 +227,7 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
               placeholder={t("question.customPh")}
               placeholderTextColor={theme.colors.onSurfaceVariant}
               editable={!isPending}
-              className="mt-2 px-3 py-2 rounded-xl text-sm"
+              className="mt-2 px-3 py-2 rounded-[28px] text-sm"
               style={{
                 backgroundColor: theme.colors.surfaceContainerLowest,
                 color: theme.colors.onSurface,
@@ -244,7 +244,7 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
         <Pressable
           onPress={() => rejectMutation.mutate()}
           disabled={isPending}
-          className="px-4 py-2 rounded-lg"
+          className="px-4 py-2 rounded-[28px]"
           style={{ backgroundColor: theme.colors.surfaceVariant }}
         >
           <Text

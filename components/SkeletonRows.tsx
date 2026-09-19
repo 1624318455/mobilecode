@@ -25,11 +25,11 @@ const Bones = memo(function Bones() {
 
   return (
     <View
-      className="rounded-2xl p-4 mb-3 flex-row items-center"
+      className="rounded-[28px] p-4 mb-3 flex-row items-center"
       style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
     >
       <Animated.View
-        className="w-10 h-10 rounded-lg mr-3"
+        className="w-10 h-10 rounded-xl mr-3"
         style={[boneColor, boneStyle]}
       />
       <View className="flex-1 gap-2">
@@ -84,15 +84,15 @@ export const BubbleSkeleton = memo(function BubbleSkeleton() {
   return (
     <View className="flex-1 py-4 gap-3">
       <Animated.View
-        className="self-start rounded-2xl h-16"
+        className="self-start rounded-[28px] h-16"
         style={[{ width: "75%" }, boneColor, animated]}
       />
       <Animated.View
-        className="self-end rounded-2xl h-10"
+        className="self-end rounded-[28px] h-10"
         style={[{ width: "55%" }, boneColor, animated]}
       />
       <Animated.View
-        className="self-start rounded-2xl h-24"
+        className="self-start rounded-[28px] h-24"
         style={[{ width: "85%" }, boneColor, animated]}
       />
     </View>

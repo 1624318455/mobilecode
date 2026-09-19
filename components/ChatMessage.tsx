@@ -30,7 +30,7 @@ export const ChatMessage = memo(function ChatMessage({ message }: ChatMessagePro
           className="max-w-[80%] px-4 py-3"
           style={{
             backgroundColor: theme.colors.errorContainer,
-            borderRadius: 20,
+            borderRadius: 28,
           }}
         >
           <View>

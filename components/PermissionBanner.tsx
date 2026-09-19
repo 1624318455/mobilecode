@@ -48,8 +48,7 @@ function getPermissionIcon(permission: string, color: string) {
 export function PermissionBanner({ request, server }: PermissionBannerProps) {
   const theme = useAppTheme();
   const { t } = useT();
-  const queryClient = useQueryClient();
-  const [rejectMessage, setRejectMessage] = useState("");
+  const queryClient = useQueryClient();  const [rejectMessage, setRejectMessage] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
 
   const replyMutation = useMutation({
@@ -108,7 +107,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
       className="mx-4 mb-3 overflow-hidden"
       style={{
         backgroundColor: theme.colors.tertiaryContainer,
-        borderRadius: 20,
+        borderRadius: 28,
       }}
     >
       {/* Header */}
@@ -126,7 +125,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
       <View className="px-4 pb-3">
         {command ? (
           <View
-            className="rounded-lg px-3 py-2 mb-2"
+            className="rounded-[28px] px-3 py-2 mb-2"
             style={{ backgroundColor: theme.colors.inverseSurface }}
           >
             <Text
@@ -144,7 +143,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
             {patterns.map((pattern, i) => (
               <Text
                 key={i}
-                className="text-xs font-mono rounded px-2 py-1"
+                className="text-xs font-mono rounded-[28px] px-2 py-1"
                 style={{
                   color: theme.colors.onTertiaryContainer,
                   backgroundColor: theme.colors.surfaceContainerLowest,
@@ -162,11 +161,10 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
           <TextInput
             value={rejectMessage}
             onChangeText={setRejectMessage}
-            placeholder={t("permission.feedbackPh")}
-            placeholderTextColor={theme.colors.onSurfaceVariant}
+            placeholder={t("permission.feedbackPh")}            placeholderTextColor={theme.colors.onSurfaceVariant}
             editable={!isPending}
             autoFocus
-            className="mb-2 px-3 py-2 rounded-lg text-sm"
+            className="mb-2 px-3 py-2 rounded-[28px] text-sm"
             style={{
               backgroundColor: theme.colors.surfaceContainerLowest,
               color: theme.colors.onSurface,
@@ -186,7 +184,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
             <Pressable
               onPress={showRejectInput ? handleReject : handleRejectImmediately}
               disabled={isPending}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-[28px]"
               style={{ backgroundColor: theme.colors.errorContainer }}
             >
               <Text
@@ -200,7 +198,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
               <Pressable
                 onPress={() => setShowRejectInput(true)}
                 disabled={isPending}
-                className="px-3 py-2 rounded-lg"
+                className="px-3 py-2 rounded-[28px]"
                 style={{ backgroundColor: theme.colors.surfaceVariant }}
               >
                 <Text
@@ -214,7 +212,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
             <Pressable
               onPress={handleAlwaysAllow}
               disabled={isPending}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-[28px]"
               style={{ backgroundColor: theme.colors.tertiary }}
             >
               <Text
@@ -227,7 +225,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
             <Pressable
               onPress={handleAllow}
               disabled={isPending}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-[28px]"
               style={{ backgroundColor: theme.colors.primary }}
             >
               <Text

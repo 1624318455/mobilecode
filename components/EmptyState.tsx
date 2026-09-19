@@ -36,8 +36,12 @@ export const EmptyState = memo(function EmptyState({
     <View className="flex-1 items-center justify-center px-8 py-12">
       <Icon size={56} color={theme.colors.onSurfaceVariant} strokeWidth={1.5} />
       <Text
-        className="text-xl font-semibold text-center mt-4"
-        style={{ color: theme.colors.onSurface }}
+        className="text-xl text-center mt-4"
+        style={{
+          color: theme.colors.onSurface,
+          fontWeight: "400",
+          letterSpacing: -0.4,
+        }}
       >
         {title}
       </Text>

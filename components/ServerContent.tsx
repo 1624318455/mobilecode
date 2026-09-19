@@ -74,7 +74,7 @@ export function ServerContent({ server }: ServerContentProps) {
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
         <View
-          className="rounded-2xl p-4 mb-4"
+          className="rounded-[28px] p-4 mb-4"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           <ProjectSessions project={item} server={server} />
@@ -86,7 +86,7 @@ export function ServerContent({ server }: ServerContentProps) {
       ListHeaderComponent={
         error ? (
           <View
-            className="rounded-2xl p-4 mb-4"
+            className="rounded-[28px] p-4 mb-4"
             style={{ backgroundColor: theme.colors.errorContainer }}
           >
             <Text style={{ color: theme.colors.onErrorContainer }}>
@@ -119,7 +119,7 @@ export function ServerContent({ server }: ServerContentProps) {
       ListFooterComponent={
         <>
           <View
-            className="rounded-2xl p-4 mb-4 mt-8"
+            className="rounded-[28px] p-4 mb-4 mt-8"
             style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
           >
             <Text
@@ -138,7 +138,7 @@ export function ServerContent({ server }: ServerContentProps) {
 
           <Pressable
             onPress={handleDeleteServer}
-            className="rounded-2xl p-4 flex-row items-center justify-center"
+            className="rounded-[28px] p-4 flex-row items-center justify-center"
             style={{ backgroundColor: theme.colors.errorContainer }}
           >
             <Trash2 size={20} color={theme.colors.onErrorContainer} />

@@ -189,7 +189,7 @@ export function SessionSettingsContent({
         <ScrollView>
           <View className="p-4">
             <View
-              className="rounded-2xl p-4 flex-row items-center justify-between"
+              className="rounded-[28px] p-4 flex-row items-center justify-between"
               style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
             >
               <Text
@@ -207,7 +207,7 @@ export function SessionSettingsContent({
             </View>
 
             <View
-              className="mt-4 rounded-2xl p-4"
+              className="mt-4 rounded-[28px] p-4"
               style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
             >
               <Text
@@ -223,7 +223,7 @@ export function SessionSettingsContent({
                   placeholder={t("sessionSettings.renamePh")}
                   placeholderTextColor={theme.colors.onSurfaceVariant}
                   autoCorrect={false}
-                  className="flex-1 px-3 py-2 rounded-xl text-base"
+                  className="flex-1 px-3 py-2 rounded-[28px] text-base"
                   style={{
                     backgroundColor: theme.colors.surfaceContainerLowest,
                     color: theme.colors.onSurface,
@@ -238,7 +238,7 @@ export function SessionSettingsContent({
                     }
                   }}
                   disabled={renameMutation.isPending || !title.trim()}
-                  className="px-4 py-2 rounded-xl opacity-100 disabled:opacity-50"
+                  className="px-4 py-2 rounded-[28px] opacity-100 disabled:opacity-50"
                   style={{ backgroundColor: theme.colors.primary }}
                 >
                   <Text
@@ -286,7 +286,7 @@ export function SessionSettingsContent({
                 );
               }}
               disabled={archiveMutation.isPending}
-              className="mt-4 rounded-2xl p-4 items-center opacity-100 disabled:opacity-50"
+              className="mt-4 rounded-[28px] p-4 items-center opacity-100 disabled:opacity-50"
               style={{ backgroundColor: theme.colors.error }}
             >
               <Text
@@ -330,7 +330,7 @@ export function SessionSettingsContent({
                 );
               }}
               disabled={deleteMutation.isPending}
-              className="mt-4 rounded-2xl p-4 items-center opacity-100 disabled:opacity-50"
+              className="mt-4 rounded-[28px] p-4 items-center opacity-100 disabled:opacity-50"
               style={{ backgroundColor: theme.colors.errorContainer }}
             >
               <Text

@@ -119,7 +119,7 @@ export function ProjectSessions({ project, server }: ProjectSessionsProps) {
       <Pressable
         onPress={() => createSessionMutation.mutate()}
         disabled={createSessionMutation.isPending}
-        className="rounded-2xl p-3 flex-row items-center mb-2"
+        className="rounded-[28px] p-3 flex-row items-center mb-2"
         style={{ backgroundColor: theme.colors.secondaryContainer }}
       >
         {createSessionMutation.isPending ? (
@@ -165,7 +165,7 @@ export function ProjectSessions({ project, server }: ProjectSessionsProps) {
       {hasMore && (
         <Pressable
           onPress={() => setShowAll(!showAll)}
-          className="rounded-2xl p-3 flex-row items-center justify-center mt-2"
+          className="rounded-[28px] p-3 flex-row items-center justify-center mt-2"
           style={{ backgroundColor: theme.colors.surfaceVariant }}
         >
           {showAll ? (

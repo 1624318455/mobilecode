@@ -8,8 +8,9 @@ import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { EmptyState } from "@/components/EmptyState";
 import { SignatureEntrance } from "@/components/SignatureEntrance";
 import { useDeviceRecords } from "@/hooks/useDeviceRecords";
-import { DeviceRecord } from "@/lib/protocol";
 import { useT } from "@/lib/i18n";
+import { useNotifyColors } from "@/lib/notify";
+import { DeviceRecord } from "@/lib/protocol";
 import { Server, useAppStore } from "@/stores";
 
 interface DeviceRowHostProps {
@@ -55,6 +56,7 @@ const DeviceRowHost = memo(function DeviceRowHost({
 export default function ServersScreen() {
   const theme = useAppTheme();
   const { t } = useT();
+  const notify = useNotifyColors();
   const servers = useAppStore((s) => s.servers);
   const { records, checking, check } = useDeviceRecords(servers);
   const autoChecked = useRef<Set<string>>(new Set());
@@ -106,12 +108,12 @@ export default function ServersScreen() {
         <View>
           {needsRepair.length > 0 && (
             <View
-              className="rounded-2xl p-3 mb-4"
-              style={{ backgroundColor: theme.colors.tertiaryContainer }}
+              className="rounded-[28px] p-3 mb-4"
+              style={{ backgroundColor: notify.container }}
             >
               <Text
                 className="text-sm font-medium"
-                style={{ color: theme.colors.onTertiaryContainer }}
+                style={{ color: notify.onContainer }}
               >
                 {needsRepair.length === 1
                   ? t("servers.repairBannerOne", { n: 1 })
@@ -123,7 +125,7 @@ export default function ServersScreen() {
               >
                 <Text
                   className="font-semibold text-sm"
-                  style={{ color: theme.colors.onTertiaryContainer }}
+                  style={{ color: notify.onContainer }}
                 >
                   {t("servers.pairAgain")}
                 </Text>
@@ -132,7 +134,7 @@ export default function ServersScreen() {
           )}
           <Pressable
             onPress={() => router.push("/server/new")}
-            className="rounded-2xl p-4 flex-row items-center justify-center mb-3"
+            className="rounded-[28px] p-4 flex-row items-center justify-center mb-3"
             style={{ backgroundColor: theme.colors.primary }}
           >
             <Plus size={20} color={theme.colors.onPrimary} />
@@ -145,7 +147,7 @@ export default function ServersScreen() {
           </Pressable>
           <Pressable
             onPress={() => router.push("/server/pair")}
-            className="rounded-2xl p-4 flex-row items-center justify-center mb-4"
+            className="rounded-[28px] p-4 flex-row items-center justify-center mb-4"
             style={{ backgroundColor: theme.colors.surfaceVariant }}
           >
             <Link2 size={20} color={theme.colors.primary} />

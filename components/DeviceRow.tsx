@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { formatTimeAgo } from "@/lib/formatTimeAgo";
 import { useT } from "@/lib/i18n";
+import { useNotifyColors } from "@/lib/notify";
 import { DeviceRecord, Reachability } from "@/lib/protocol";
 import { clearSecureForServer } from "@/lib/secure";
 import { useAppStore } from "@/stores";
@@ -33,6 +34,7 @@ export const DeviceRow = memo(function DeviceRow({
 }: DeviceRowProps) {
   const theme = useAppTheme();
   const { t } = useT();
+  const notify = useNotifyColors();
   const removeServer = useAppStore((s) => s.removeServer);
   const server = useAppStore((s) => s.servers.find((x) => x.id === record.id));
 
@@ -41,7 +43,7 @@ export const DeviceRow = memo(function DeviceRow({
     checking: theme.colors.onSurfaceVariant,
     unreachable: theme.colors.onSurfaceVariant,
     revoked: theme.colors.onSurfaceVariant,
-    expired: theme.colors.tertiary,
+    expired: notify.accent,
   };
 
   const handleMenu = () => {
@@ -91,7 +93,7 @@ export const DeviceRow = memo(function DeviceRow({
   return (
     <Pressable
       onPress={onOpen}
-      className="rounded-2xl p-4 mb-3 active:opacity-80"
+      className="rounded-[28px] p-4 mb-3 active:opacity-80"
       style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
     >
       <View className="flex-row items-center">
@@ -153,12 +155,12 @@ export const DeviceRow = memo(function DeviceRow({
           onPress={() => {
             router.push("/server/pair");
           }}
-          className="mt-3 rounded-lg py-2 items-center"
-          style={{ backgroundColor: theme.colors.tertiaryContainer }}
+          className="mt-3 rounded-[28px] py-2 items-center"
+          style={{ backgroundColor: notify.container }}
         >
           <Text
             className="font-medium text-sm"
-            style={{ color: theme.colors.onTertiaryContainer }}
+            style={{ color: notify.onContainer }}
           >
             {t("device.repairCta")}
           </Text>

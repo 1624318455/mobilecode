@@ -70,7 +70,10 @@ function RootLayoutNav() {
   return (
     <StrictMode>
       <KeyboardProvider>
-        <Material3ThemeProvider>
+        <Material3ThemeProvider
+          sourceColor="#0052FF"
+          fallbackSourceColor="#0052FF"
+        >
           <QueryClientProvider client={queryClient}>
             <ThemeProvider
               value={colorScheme === "dark" ? DarkTheme : DefaultTheme}

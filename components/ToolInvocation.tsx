@@ -115,7 +115,7 @@ function ToolCard({
       className="mt-2 overflow-hidden"
       style={{
         backgroundColor: theme.colors.surfaceContainer,
-        borderRadius: 16,
+        borderRadius: 28,
       }}
     >
       <Pressable

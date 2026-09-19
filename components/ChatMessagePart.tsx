@@ -12,7 +12,7 @@ interface ChatMessagePartProps {
   isUser: boolean;
 }
 
-const BUBBLE_RADIUS = 20;
+const BUBBLE_RADIUS = 28;
 
 export const ChatMessagePart = memo(function ChatMessagePart({
   part,

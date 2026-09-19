@@ -21,12 +21,12 @@ export function SessionCard({ title, updatedAt, onPress, agent, modelName }: Ses
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-2xl p-4 mb-3 active:opacity-80"
+      className="rounded-[28px] p-4 mb-3 active:opacity-80"
       style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
     >
       <View className="flex-row items-center">
         <View
-          className="w-10 h-10 rounded-lg items-center justify-center mr-3"
+          className="w-10 h-10 rounded-xl items-center justify-center mr-3"
           style={{ backgroundColor: theme.colors.tertiaryContainer }}
         >
           <MessageSquare size={20} color={theme.colors.tertiary} />

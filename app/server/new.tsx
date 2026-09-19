@@ -60,7 +60,7 @@ export default function AddServerScreen() {
   const inputStyle = {
     backgroundColor: theme.colors.surfaceContainerHigh,
     color: theme.colors.onSurface,
-    borderRadius: 12,
+    borderRadius: 28,
   };
   const labelStyle = { color: theme.colors.onSurfaceVariant };
 
@@ -75,7 +75,7 @@ export default function AddServerScreen() {
         {/* Server Icon */}
         <View className="items-center py-6">
           <View
-            className="w-20 h-20 rounded-2xl items-center justify-center"
+            className="w-20 h-20 rounded-[28px] items-center justify-center"
             style={{ backgroundColor: theme.colors.primaryContainer }}
           >
             <Server size={40} color={theme.colors.primary} />
@@ -161,7 +161,7 @@ export default function AddServerScreen() {
             })
           }
           disabled={testing}
-          className="rounded-xl py-3 flex-row items-center justify-center mb-4"
+          className="rounded-[28px] py-3 flex-row items-center justify-center mb-4"
           style={{ backgroundColor: theme.colors.surfaceVariant }}
         >
           {testing ? (
@@ -199,7 +199,7 @@ export default function AddServerScreen() {
         {/* Error Message */}
         {(error || validationError) && (
           <View
-            className="rounded-xl p-3 mb-4"
+            className="rounded-[28px] p-3 mb-4"
             style={{ backgroundColor: theme.colors.errorContainer }}
           >
             <Text
@@ -214,7 +214,7 @@ export default function AddServerScreen() {
         {/* Save Button */}
         <Pressable
           onPress={handleSave}
-          className="rounded-xl py-4 items-center"
+          className="rounded-[28px] py-4 items-center"
           style={{ backgroundColor: theme.colors.primary }}
         >
           <Text
@@ -228,7 +228,7 @@ export default function AddServerScreen() {
         {/* Pairing Entry */}
         <Pressable
           onPress={() => router.push("/server/pair")}
-          className="rounded-xl py-3 items-center mt-4"
+          className="rounded-[28px] py-3 items-center mt-4"
           style={{ backgroundColor: theme.colors.surfaceVariant }}
         >
           <Text
@@ -241,7 +241,7 @@ export default function AddServerScreen() {
 
         {/* Help Text */}
         <View
-          className="mt-6 p-4 rounded-xl"
+          className="mt-6 p-4 rounded-[28px]"
           style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
         >
           <Text
