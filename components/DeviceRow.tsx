@@ -156,7 +156,11 @@ export const DeviceRow = memo(function DeviceRow({
             router.push("/server/pair");
           }}
           className="mt-3 rounded-[28px] py-2 items-center"
-          style={{ backgroundColor: notify.container }}
+          style={{
+            backgroundColor: "#FFFFFF",
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <Text
             className="font-medium text-sm"

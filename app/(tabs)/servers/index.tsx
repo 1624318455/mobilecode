@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Link2, Plus } from "lucide-react-native";
 import { FlatList, Pressable, Text, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 
 import { DeviceRow } from "@/components/DeviceRow";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
@@ -107,9 +108,14 @@ export default function ServersScreen() {
       ListHeaderComponent={
         <View>
           {needsRepair.length > 0 && (
-            <View
+            <Animated.View
+              entering={FadeIn.duration(200)}
               className="rounded-[28px] p-3 mb-4"
-              style={{ backgroundColor: notify.container }}
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderWidth: 1,
+                borderColor: theme.colors.outlineVariant,
+              }}
             >
               <Text
                 className="text-sm font-medium"
@@ -130,7 +136,7 @@ export default function ServersScreen() {
                   {t("servers.pairAgain")}
                 </Text>
               </Pressable>
-            </View>
+            </Animated.View>
           )}
           <Pressable
             onPress={() => router.push("/server/new")}

@@ -32,11 +32,13 @@ export function useModels(server: Server) {
       return (data.all || [])
         .filter((p) => connected.has(p.id))
         .flatMap((p) =>
-          Object.values(p.models || {}).map((m) => ({
-            id: m.id,
-            providerID: p.id,
-            name: m.name,
-          })),
+          Object.values(p.models || {})
+            .filter((m) => m.id && m.name)
+            .map((m) => ({
+              id: m.id,
+              providerID: p.id,
+              name: m.name,
+            })),
         );
     },
   });

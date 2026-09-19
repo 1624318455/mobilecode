@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import type { PermissionRequest } from "@opencode-ai/sdk/v2";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
@@ -103,11 +104,15 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
   const command = metadata.command as string | undefined;
 
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(200)}
       className="mx-4 mb-3 overflow-hidden"
       style={{
-        backgroundColor: theme.colors.tertiaryContainer,
+        backgroundColor: "#FFFFFF",
         borderRadius: 28,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
       }}
     >
       {/* Header */}
@@ -248,6 +253,6 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
           {t("feedback.replyFailed")}
         </Text>
       )}
-    </View>
+    </Animated.View>
   );
 }

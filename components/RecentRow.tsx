@@ -4,7 +4,6 @@ import { memo, useCallback } from "react";
 import { Image, Text, View } from "react-native";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
-import { SessionBadges } from "@/components/SessionBadges";
 import { SignatureCard } from "@/components/SignatureCard";
 import { SignatureEntrance } from "@/components/SignatureEntrance";
 import { formatTimeAgo } from "@/lib/formatTimeAgo";
@@ -61,9 +60,6 @@ export const RecentRow = memo(function RecentRow({ item, index, animate = true }
             >
               {item.projectName} • {item.serverName}
             </Text>
-            {(item.agent || item.modelName) && (
-              <SessionBadges agent={item.agent} modelName={item.modelName} />
-            )}
             <Text
               className="text-xs mt-0.5"
               style={{ color: theme.colors.onSurfaceVariant }}

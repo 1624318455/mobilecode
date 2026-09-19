@@ -1,6 +1,6 @@
 import MarkdownIt from "markdown-it";
 import React, { useMemo } from "react";
-import { Linking, Platform, Text } from "react-native";
+import { Image, Linking, Platform, Text } from "react-native";
 import Markdown from "react-native-markdown-display";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
@@ -197,9 +197,9 @@ function buildMarkdownStyles(p: MdPalette) {
     },
     text: {},
     textgroup: {},
-    image: {
-      flex: 1,
-    },
+        image: {
+          flex: 1,
+        },
     hardbreak: {
       width: "100%" as const,
       height: 1,
@@ -234,6 +234,16 @@ interface MarkdownContentProps {
 
 export function MarkdownContent({ content, isUser }: MarkdownContentProps) {
   const theme = useAppTheme();
+
+  // markdown-it has no task-list plugin: rewrite `- [ ]` / `- [x]` into
+  // glyphs before parsing so checklist items render instead of raw brackets.
+  const prepared = useMemo(
+    () =>
+      content
+        .replace(/^- \[ \]/gm, "☐")
+        .replace(/^- \[[xX]\]/gm, "☑"),
+    [content],
+  );
 
   const styles = useMemo(() => {
     if (isUser) {
@@ -354,9 +364,25 @@ export function MarkdownContent({ content, isUser }: MarkdownContentProps) {
             </Text>
           );
         },
+        image: (node) => {
+          const src = node.attributes?.src;
+
+          if (typeof src !== "string" || !src) {
+            return null;
+          }
+
+          return (
+            <Image
+              key={node.key}
+              source={{ uri: src }}
+              style={{ width: "100%", height: 200 }}
+              resizeMode="contain"
+            />
+          );
+        },
       }}
     >
-      {content}
+      {prepared}
     </Markdown>
   );
 }

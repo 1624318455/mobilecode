@@ -131,45 +131,64 @@ export function SessionChatContent({
           providerID: "opencode",
         };
 
-  // Initialize selected agent from the session's last message
-  const initialAgentSet = useRef(false);
+  // Track the latest user message by id: whenever a NEWER user message
+  // arrives (initial load finishing late, or a just-sent message), sync the
+  // agent/model pickers from it. A user override made through the picker
+  // survives because the message id does not change underneath it.
+  // Sessions with no user message yet fall back to the first model so the
+  // picker never renders empty.
+  const appliedMessageId = useRef<string | null>(null);
   useEffect(() => {
-    if (initialAgentSet.current || agents.length === 0 || !latestUserMessage) {
+    if (models.length === 0) {
       return;
     }
 
-    const agentFromMessage =
-      latestUserMessage.info.role === "user"
-        ? latestUserMessage.info.agent
-        : undefined;
+    if (
+      !latestUserMessage ||
+      latestUserMessage.info.role !== "user" ||
+      latestUserMessage.info.id === appliedMessageId.current
+    ) {
+      if (!latestUserMessage && appliedMessageId.current !== "none") {
+        if (!selectedModel) {
+          setSelectedModel(models[0]);
+        }
 
-    if (agentFromMessage && agents.some((a) => a.name === agentFromMessage)) {
+        appliedMessageId.current = "none";
+      }
+
+      return;
+    }
+
+    const agentFromMessage = latestUserMessage.info.agent;
+
+    if (
+      agentFromMessage &&
+      agents.some((a) => a.name === agentFromMessage)
+    ) {
       setSelectedAgent(agentFromMessage);
-      initialAgentSet.current = true;
-    }
-  }, [agents, latestUserMessage, setSelectedAgent]);
-
-  // Initialize selected model from the session's last message
-  const initialModelSet = useRef(false);
-  useEffect(() => {
-    if (initialModelSet.current || models.length === 0) {
-      return;
     }
 
-    const matchFromMessage = models.find(
-      (m) =>
-        m.id === currentModel.modelID &&
-        m.providerID === currentModel.providerID,
-    );
+    if (models.length > 0) {
+      const matchFromMessage = models.find(
+        (m) =>
+          m.id === currentModel.modelID &&
+          m.providerID === currentModel.providerID,
+      );
 
-    if (matchFromMessage) {
-      setSelectedModel(matchFromMessage);
-      initialModelSet.current = true;
-    } else if (models.length > 0) {
-      setSelectedModel(models[0]);
-      initialModelSet.current = true;
+      setSelectedModel(matchFromMessage || models[0]);
     }
-  }, [models, currentModel.modelID, currentModel.providerID, setSelectedModel]);
+
+    appliedMessageId.current = latestUserMessage.info.id;
+  }, [
+    agents,
+    currentModel.modelID,
+    currentModel.providerID,
+    latestUserMessage,
+    models,
+    selectedModel,
+    setSelectedAgent,
+    setSelectedModel,
+  ]);
 
   const modelForSend = selectedModel
     ? { modelID: selectedModel.id, providerID: selectedModel.providerID }

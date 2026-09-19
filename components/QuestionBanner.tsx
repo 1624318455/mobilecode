@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import type { QuestionRequest } from "@opencode-ai/sdk/v2";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
@@ -128,11 +129,15 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
     customInputs.some((t) => t.trim().length > 0);
 
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(200)}
       className="mx-4 mb-3 overflow-hidden"
       style={{
-        backgroundColor: theme.colors.secondaryContainer,
+        backgroundColor: "#FFFFFF",
         borderRadius: 28,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
       }}
     >
       {/* Header */}
@@ -291,6 +296,6 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
           {t("feedback.replyFailed")}
         </Text>
       )}
-    </View>
+    </Animated.View>
   );
 }
