@@ -36,6 +36,7 @@ const en = {
     pairComputer: "Pair a computer",
     notChecked: "Not checked yet",
     retry: "Retry",
+    connected: "Connected",
     wsTitle: "Third-party WebSocket paths",
     wsEmpty:
       "No intercepted connections recorded. Unknown plugin paths will appear here grouped by directory with hit counts — allow only exact paths you trust.",

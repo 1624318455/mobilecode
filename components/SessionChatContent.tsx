@@ -194,6 +194,19 @@ export function SessionChatContent({
     ? { modelID: selectedModel.id, providerID: selectedModel.providerID }
     : currentModel;
 
+  // What the chip shows: prefer the picked model, but fall back to the model
+  // recorded on the latest user message so the name is correct on first paint
+  // instead of waiting for the provider catalog.
+  const displayModel =
+    selectedModel ||
+    (latestUserMessage?.info.role === "user"
+      ? {
+          id: latestUserMessage.info.model.modelID,
+          providerID: latestUserMessage.info.model.providerID,
+          name: latestUserMessage.info.model.modelID,
+        }
+      : undefined);
+
   const sendMessageMutation = useMutation({
     mutationFn: async ({
       text,
@@ -365,7 +378,7 @@ export function SessionChatContent({
               onSend={handleSend}
               disabled={sendMessageMutation.isPending}
               selectedAgent={selectedAgent}
-              selectedModel={selectedModel}
+              selectedModel={displayModel}
               server={server}
               projectPath={projectPath}
             />

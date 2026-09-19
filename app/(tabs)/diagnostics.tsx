@@ -130,11 +130,18 @@ export default function DiagnosticsScreen() {
                 </View>
                 <Pressable
                   onPress={() => checkServer(server)}
-                  disabled={busy}
+                  disabled={busy || check?.state === "ok"}
                   className="p-2"
                 >
                   {busy ? (
                     <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : check?.state === "ok" ? (
+                    <Text
+                      className="font-medium"
+                      style={{ color: theme.colors.onSurface }}
+                    >
+                      {t("diagnostics.connected")}
+                    </Text>
                   ) : (
                     <Text
                       className="font-medium"

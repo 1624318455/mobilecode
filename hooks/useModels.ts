@@ -9,19 +9,20 @@ export interface ModelInfo {
   name: string;
 }
 
+export async function fetchProviders(server: Server) {
+  const client = createClient({
+    baseUrl: server.url,
+    username: server.username,
+    password: server.password,
+  });
+
+  return (await client.provider.list()).data;
+}
+
 export function useModels(server: Server) {
   return useQuery({
     queryKey: ["server", server.url, "providers"],
-    queryFn: async () => {
-      const client = createClient({
-        baseUrl: server.url,
-        username: server.username,
-        password: server.password,
-      });
-      const result = await client.provider.list();
-
-      return result.data;
-    },
+    queryFn: () => fetchProviders(server),
     select: (data) => {
       if (!data) {
         return [];

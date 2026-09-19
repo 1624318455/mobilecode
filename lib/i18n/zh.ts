@@ -38,6 +38,7 @@ const zh: Dict = {
     pairComputer: "配对电脑",
     notChecked: "尚未检测",
     retry: "重试",
+    connected: "已连接",
     wsTitle: "第三方 WebSocket 路径",
     wsEmpty:
       "暂无被拦截的连接。未知插件路径会按目录分组出现在这里并计数——只放行你信任的精确路径。",

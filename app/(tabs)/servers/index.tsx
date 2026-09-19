@@ -110,7 +110,7 @@ export default function ServersScreen() {
           {needsRepair.length > 0 && (
             <Animated.View
               entering={FadeIn.duration(200)}
-              className="rounded-[28px] p-3 mb-4"
+              className="rounded-[28px] p-4 mb-4"
               style={{
                 backgroundColor: "#FFFFFF",
                 borderWidth: 1,
@@ -138,32 +138,34 @@ export default function ServersScreen() {
               </Pressable>
             </Animated.View>
           )}
-          <Pressable
-            onPress={() => router.push("/server/new")}
-            className="rounded-[28px] p-4 flex-row items-center justify-center mb-3"
-            style={{ backgroundColor: theme.colors.primary }}
-          >
-            <Plus size={20} color={theme.colors.onPrimary} />
-            <Text
-              className="font-semibold ml-2"
-              style={{ color: theme.colors.onPrimary }}
+          <View className="flex-row gap-3 mb-4">
+            <Pressable
+              onPress={() => router.push("/server/new")}
+              className="flex-1 rounded-[28px] p-4 flex-row items-center justify-center"
+              style={{ backgroundColor: theme.colors.primary }}
             >
-              {t("servers.addServer")}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/server/pair")}
-            className="rounded-[28px] p-4 flex-row items-center justify-center mb-4"
-            style={{ backgroundColor: theme.colors.surfaceVariant }}
-          >
-            <Link2 size={20} color={theme.colors.primary} />
-            <Text
-              className="font-semibold ml-2"
-              style={{ color: theme.colors.onSurfaceVariant }}
+              <Plus size={20} color={theme.colors.onPrimary} />
+              <Text
+                className="font-semibold ml-2"
+                style={{ color: theme.colors.onPrimary }}
+              >
+                {t("servers.addServer")}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push("/server/pair")}
+              className="flex-1 rounded-[28px] p-4 flex-row items-center justify-center"
+              style={{ backgroundColor: theme.colors.surfaceVariant }}
             >
-              {t("servers.pairComputer")}
-            </Text>
-          </Pressable>
+              <Link2 size={20} color={theme.colors.primary} />
+              <Text
+                className="font-semibold ml-2"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {t("servers.pairComputer")}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       }
       ListEmptyComponent={

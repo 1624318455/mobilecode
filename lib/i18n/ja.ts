@@ -38,6 +38,7 @@ const ja: Dict = {
     pairComputer: "PCをペアリング",
     notChecked: "未チェック",
     retry: "再試行",
+    connected: "接続済み",
     wsTitle: "サードパーティ WebSocket パス",
     wsEmpty:
       "ブロックされた接続はありません。不明なプラグインパスは件数付きでここに表示されます。信頼できる完全一致パスのみ許可してください。",

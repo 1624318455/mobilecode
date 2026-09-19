@@ -12,6 +12,7 @@ import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { EmptyState } from "@/components/EmptyState";
 import { RecentRow } from "@/components/RecentRow";
 import { SkeletonRows } from "@/components/SkeletonRows";
+import { fetchProviders } from "@/hooks/useModels";
 import { RecentSession, useAllSessions } from "@/hooks/useAllSessions";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/stores";
@@ -30,6 +31,18 @@ export default function RecentsScreen() {
   const redirected = useRef(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [scrolled, setScrolled] = useState(false);
+
+  // Warm the provider catalog (6MB on some servers) while the user is still
+  // on the dashboard, so opening a session finds models already cached.
+  useEffect(() => {
+    servers.forEach((server) => {
+      queryClient.prefetchQuery({
+        queryKey: ["server", server.url, "providers"],
+        queryFn: () => fetchProviders(server),
+        staleTime: 5 * 60 * 1000,
+      });
+    });
+  }, [servers, queryClient]);
 
   useEffect(() => {
     if (redirected.current) {
