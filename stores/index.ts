@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { zustandStorage } from "@/lib/mmkv";
+import { clearSecureForServer } from "@/lib/secure";
+import { useWsRules } from "@/stores/diagnostics";
 
 const STORE_NAME = "mobilecode-store";
 const STORE_VERSION = 2;
@@ -184,12 +186,21 @@ export const useAppStore = create<AppState>()(
 
       // Clear all data
       clearAllData: () => {
+        const refs = get()
+          .servers.map((s) => s.deviceTokenRef)
+          .filter((r): r is string => !!r);
+
         set({
           servers: [],
           startupBehavior: "list",
           lastServerId: null,
         });
         zustandStorage.removeItem(STORE_NAME);
+        useWsRules.getState().clearRules();
+
+        for (const ref of refs) {
+          clearSecureForServer(ref);
+        }
       },
     }),
     {

@@ -2,7 +2,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   Text,
@@ -11,6 +10,7 @@ import {
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { RecentRow } from "@/components/RecentRow";
+import { SkeletonRows } from "@/components/SkeletonRows";
 import { RecentSession, useAllSessions } from "@/hooks/useAllSessions";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/stores";
@@ -28,6 +28,7 @@ export default function RecentsScreen() {
   const { recentSessions, isLoading } = useAllSessions(servers);
   const redirected = useRef(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (redirected.current) {
@@ -63,9 +64,9 @@ export default function RecentsScreen() {
 
   const renderItem = useCallback(
     ({ item, index }: { item: RecentSession; index: number }) => (
-      <RecentRow item={item} index={index} />
+      <RecentRow item={item} index={index} animate={!scrolled} />
     ),
-    [],
+    [scrolled],
   );
 
   return (
@@ -79,21 +80,14 @@ export default function RecentsScreen() {
       }
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.5}
+      onScrollBeginDrag={() => setScrolled(true)}
       refreshControl={
         <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
       }
       renderItem={renderItem}
       ListEmptyComponent={
         isLoading ? (
-          <View className="flex-1 items-center justify-center py-12">
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text
-              className="mt-3"
-              style={{ color: theme.colors.onSurfaceVariant }}
-            >
-              {t("recents.loading")}
-            </Text>
-          </View>
+          <SkeletonRows count={5} />
         ) : (
           <View className="flex-1 items-center justify-center py-12">
             <Text

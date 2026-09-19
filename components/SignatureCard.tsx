@@ -17,10 +17,12 @@ export function SignatureCard({ children, onPress, style }: SignatureCardProps) 
   return (
     <Pressable
       onPress={onPress}
-      style={[
+      android_ripple={{ color: theme.colors.onSurface, borderless: false }}
+      style={({ pressed }) => [
         {
           backgroundColor: theme.colors.surfaceContainerHigh,
           borderRadius: SIGNATURE_RADIUS,
+          opacity: pressed ? 0.88 : 1,
         },
         style,
       ]}

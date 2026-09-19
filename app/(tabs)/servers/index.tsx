@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Link2, Plus } from "lucide-react-native";
 import { FlatList, Pressable, Text, View } from "react-native";
 
@@ -16,6 +16,7 @@ interface DeviceRowHostProps {
   record: DeviceRecord;
   server: Server;
   checking: boolean;
+  animate: boolean;
   onCheckServer: (server: Server) => void;
 }
 
@@ -24,6 +25,7 @@ const DeviceRowHost = memo(function DeviceRowHost({
   record,
   server,
   checking,
+  animate,
   onCheckServer,
 }: DeviceRowHostProps) {
   const setLastServerId = useAppStore((s) => s.setLastServerId);
@@ -38,7 +40,7 @@ const DeviceRowHost = memo(function DeviceRowHost({
   }, [setLastServerId, server.id]);
 
   return (
-    <SignatureEntrance index={index}>
+    <SignatureEntrance index={index} animate={animate}>
       <DeviceRow
         record={record}
         checking={checking}
@@ -55,6 +57,7 @@ export default function ServersScreen() {
   const servers = useAppStore((s) => s.servers);
   const { records, checking, check } = useDeviceRecords(servers);
   const autoChecked = useRef<Set<string>>(new Set());
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     servers.forEach((server) => {
@@ -81,11 +84,12 @@ export default function ServersScreen() {
           record={item}
           server={server}
           checking={!!checking[item.id]}
+          animate={!scrolled}
           onCheckServer={check}
         />
       );
     },
-    [servers, checking, check],
+    [servers, checking, check, scrolled],
   );
 
   return (
@@ -96,6 +100,7 @@ export default function ServersScreen() {
       data={records}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
+      onScrollBeginDrag={() => setScrolled(true)}
       ListHeaderComponent={
         <View>
           {needsRepair.length > 0 && (

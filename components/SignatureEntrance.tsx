@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { View } from "react-native";
 import Animated, { FadeIn, FadeInDown, useReducedMotion } from "react-native-reanimated";
 
 export const STAGGER_MS = 60;
@@ -11,10 +12,19 @@ export function staggerDelay(index: number): number {
 interface SignatureEntranceProps {
   index: number;
   children: ReactNode;
+  animate?: boolean;
 }
 
-export function SignatureEntrance({ index, children }: SignatureEntranceProps) {
+export function SignatureEntrance({
+  index,
+  children,
+  animate = true,
+}: SignatureEntranceProps) {
   const reduceMotion = useReducedMotion();
+
+  if (!animate) {
+    return <View>{children}</View>;
+  }
 
   return (
     <Animated.View

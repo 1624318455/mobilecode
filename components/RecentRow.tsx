@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { Folder } from "lucide-react-native";
 import { memo, useCallback } from "react";
 import { Image, Text, View } from "react-native";
 
@@ -12,9 +13,10 @@ import { RecentSession } from "@/hooks/useAllSessions";
 interface RecentRowProps {
   item: RecentSession;
   index: number;
+  animate?: boolean;
 }
 
-export const RecentRow = memo(function RecentRow({ item, index }: RecentRowProps) {
+export const RecentRow = memo(function RecentRow({ item, index, animate = true }: RecentRowProps) {
   const theme = useAppTheme();
   const { t } = useT();
 
@@ -25,7 +27,7 @@ export const RecentRow = memo(function RecentRow({ item, index }: RecentRowProps
   }, [item.serverId, item.projectId, item.sessionId]);
 
   return (
-    <SignatureEntrance index={index}>
+    <SignatureEntrance index={index} animate={animate}>
       <SignatureCard onPress={handlePress} style={{ padding: 16, marginBottom: 12 }}>
         <View className="flex-row items-center">
           <View
@@ -41,7 +43,7 @@ export const RecentRow = memo(function RecentRow({ item, index }: RecentRowProps
                 style={{ width: 32, height: 32 }}
               />
             ) : (
-              <Text className="text-2xl">📁</Text>
+              <Folder size={20} color={theme.colors.onSecondaryContainer} />
             )}
           </View>
           <View className="flex-1">
