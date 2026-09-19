@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ChatMessage } from "@/components/ChatMessage";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { EmptyState } from "@/components/EmptyState";
 import { useT } from "@/lib/i18n";
 import { MentionedFile, MessageInput } from "@/components/MessageInput";
 import { PermissionBanner } from "@/components/PermissionBanner";
@@ -323,14 +324,11 @@ export function SessionChatContent({
                     </Text>
                   </View>
                 ) : (
-                  <View className="flex-1 items-center justify-center p-4">
-                    <Text
-                      className="text-center"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      {t("chat.empty")}
-                    </Text>
-                  </View>
+                  <EmptyState
+                    kind="chat"
+                    title={t("chat.emptyTitle")}
+                    body={t("chat.emptyBody")}
+                  />
                 )
               }
             />

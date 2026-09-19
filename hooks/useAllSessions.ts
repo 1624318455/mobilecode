@@ -14,6 +14,8 @@ export interface RecentSession {
   sessionTitle: string;
   updatedAt: string;
   directory: string;
+  agent?: string;
+  modelName?: string;
 }
 
 export function basenameOf(directory: string): string {
@@ -41,6 +43,11 @@ function sessionDirectory(s: Session): string {
   return "";
 }
 
+interface SessionRuntime {
+  agent?: string;
+  model?: { id?: string };
+}
+
 function normalizeSession(server: Server, s: Session): RecentSession | null {
   if (s.time?.archived) {
     return null;
@@ -53,6 +60,8 @@ function normalizeSession(server: Server, s: Session): RecentSession | null {
     return null;
   }
 
+  const runtime = s as Session & SessionRuntime;
+
   return {
     serverId: server.id,
     serverName: server.name,
@@ -63,6 +72,8 @@ function normalizeSession(server: Server, s: Session): RecentSession | null {
     sessionTitle: s.title || `Session ${s.id.slice(0, 8)}`,
     updatedAt: new Date(updated).toISOString(),
     directory,
+    agent: runtime.agent || undefined,
+    modelName: runtime.model?.id || undefined,
   };
 }
 

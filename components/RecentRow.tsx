@@ -60,6 +60,38 @@ export const RecentRow = memo(function RecentRow({ item, index, animate = true }
             >
               {item.projectName} • {item.serverName}
             </Text>
+            {(item.agent || item.modelName) && (
+              <View className="flex-row mt-1.5 gap-1.5">
+                {item.agent && (
+                  <View
+                    className="px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: theme.colors.secondaryContainer }}
+                  >
+                    <Text
+                      className="text-xs font-medium capitalize"
+                      style={{ color: theme.colors.onSecondaryContainer }}
+                    >
+                      {item.agent}
+                    </Text>
+                  </View>
+                )}
+                {item.modelName && (
+                  <View
+                    className="px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: theme.colors.tertiaryContainer }}
+                    accessibilityLabel={item.modelName}
+                  >
+                    <Text
+                      className="text-xs font-medium"
+                      style={{ color: theme.colors.onTertiaryContainer }}
+                      numberOfLines={1}
+                    >
+                      {item.modelName}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
             <Text
               className="text-xs mt-0.5"
               style={{ color: theme.colors.onSurfaceVariant }}

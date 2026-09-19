@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { EmptyState } from "@/components/EmptyState";
 import { RecentRow } from "@/components/RecentRow";
 import { SkeletonRows } from "@/components/SkeletonRows";
 import { RecentSession, useAllSessions } from "@/hooks/useAllSessions";
@@ -89,14 +90,11 @@ export default function RecentsScreen() {
         isLoading ? (
           <SkeletonRows count={5} />
         ) : (
-          <View className="flex-1 items-center justify-center py-12">
-            <Text
-              className="text-center"
-              style={{ color: theme.colors.onSurfaceVariant }}
-            >
-              {t("recents.empty")}
-            </Text>
-          </View>
+          <EmptyState
+            kind="sessions"
+            title={t("recents.emptyTitle")}
+            body={t("recents.emptyBody")}
+          />
         )
       }
     />

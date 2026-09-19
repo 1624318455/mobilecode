@@ -15,6 +15,8 @@ const ja: Dict = {
   },
   recents: {
     loading: "最近のセッションを読み込み中…",
+    emptyTitle: "最近のセッションはありません",
+    emptyBody: "会話を始めるとここに表示されます。",
     empty: "最近のセッションはありません。\n会話を始めるとここに表示されます。",
   },
   servers: {
@@ -23,6 +25,8 @@ const ja: Dict = {
     repairBannerOne: "{n} 台のサーバーが平文 HTTP のため、暗号化利用には再ペアリングが必要です。",
     repairBannerOther: "{n} 台のサーバーが平文 HTTP のため、暗号化利用には再ペアリングが必要です。",
     pairAgain: "再ペアリング →",
+    emptyTitle: "ペアリング済みデバイスがありません",
+    emptyBody: "サーバーを追加するか PC をペアリングしてください。",
     empty: "ペアリング済みデバイスがありません。\nサーバーを追加するか PC をペアリングしてください。",
   },
   misc: {
@@ -129,6 +133,8 @@ const ja: Dict = {
   chat: {
     title: "チャット",
     loading: "メッセージを読み込み中…",
+    emptyTitle: "メッセージはまだありません",
+    emptyBody: "下から会話を始めましょう。",
     empty: "メッセージはまだありません。会話を始めましょう！",
     settings: "設定",
   },
@@ -139,6 +145,7 @@ const ja: Dict = {
   pickers: {
     searchModels: "モデルを検索…",
     noModels: "モデルが見つかりません",
+    noModelsBody: "別のキーワードで試してください。",
     selectAgent: "モードを選択",
     selectModel: "モデルを選択",
   },

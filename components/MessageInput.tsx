@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import * as Haptics from "expo-haptics";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   NativeSyntheticEvent,
@@ -269,6 +270,8 @@ export function MessageInput({
     if (!trimmed || disabled) {
       return;
     }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     // Build the file list from paths still present in the text
     const files: MentionedFile[] = [];

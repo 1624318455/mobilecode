@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
+import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -318,7 +319,12 @@ export function SessionSettingsContent({
                     {
                       text: t("sessionSettings.delete"),
                       style: "destructive",
-                      onPress: () => deleteMutation.mutate(),
+                      onPress: () => {
+                        Haptics.notificationAsync(
+                          Haptics.NotificationFeedbackType.Warning,
+                        );
+                        deleteMutation.mutate();
+                      },
                     },
                   ],
                 );

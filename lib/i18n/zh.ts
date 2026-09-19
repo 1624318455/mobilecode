@@ -15,6 +15,8 @@ const zh: Dict = {
   },
   recents: {
     loading: "正在加载最近会话…",
+    emptyTitle: "暂无最近会话",
+    emptyBody: "开始一段对话后会显示在这里。",
     empty: "暂无最近会话。\n开始一段对话后会显示在这里。",
   },
   servers: {
@@ -23,6 +25,8 @@ const zh: Dict = {
     repairBannerOne: "{n} 台服务器仍用明文 HTTP，需要重新配对以启用加密访问。",
     repairBannerOther: "{n} 台服务器仍用明文 HTTP，需要重新配对以启用加密访问。",
     pairAgain: "重新配对 →",
+    emptyTitle: "还没有配对设备",
+    emptyBody: "添加服务器或配对电脑开始使用。",
     empty: "还没有配对设备。\n添加服务器或配对电脑开始使用。",
   },
   misc: {
@@ -129,6 +133,8 @@ const zh: Dict = {
   chat: {
     title: "对话",
     loading: "正在加载消息…",
+    emptyTitle: "还没有消息",
+    emptyBody: "在下方开始对话吧。",
     empty: "还没有消息。开始对话吧！",
     settings: "设置",
   },
@@ -139,6 +145,7 @@ const zh: Dict = {
   pickers: {
     searchModels: "搜索模型…",
     noModels: "没有找到模型",
+    noModelsBody: "换个关键词试试。",
     selectAgent: "选择模式",
     selectModel: "选择模型",
   },

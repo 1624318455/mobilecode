@@ -5,6 +5,7 @@ import { FlatList, Pressable, Text, View } from "react-native";
 
 import { DeviceRow } from "@/components/DeviceRow";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { EmptyState } from "@/components/EmptyState";
 import { SignatureEntrance } from "@/components/SignatureEntrance";
 import { useDeviceRecords } from "@/hooks/useDeviceRecords";
 import { DeviceRecord } from "@/lib/protocol";
@@ -158,14 +159,13 @@ export default function ServersScreen() {
         </View>
       }
       ListEmptyComponent={
-        <View className="items-center py-12">
-          <Text
-            className="text-center"
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            {t("servers.empty")}
-          </Text>
-        </View>
+        <EmptyState
+          kind="devices"
+          title={t("servers.emptyTitle")}
+          body={t("servers.emptyBody")}
+          actionLabel={t("servers.pairComputer")}
+          onAction={() => router.push("/server/pair")}
+        />
       }
     />
   );

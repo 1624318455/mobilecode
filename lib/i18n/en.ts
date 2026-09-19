@@ -13,6 +13,8 @@ const en = {
   },
   recents: {
     loading: "Loading recent sessions...",
+    emptyTitle: "No recent sessions",
+    emptyBody: "Start a conversation to see it here.",
     empty: "No recent sessions.\nStart a conversation to see it here.",
   },
   servers: {
@@ -21,6 +23,8 @@ const en = {
     repairBannerOne: "{n} server uses plain HTTP and needs re-pairing for encrypted access.",
     repairBannerOther: "{n} servers use plain HTTP and need re-pairing for encrypted access.",
     pairAgain: "Pair again →",
+    emptyTitle: "No devices paired",
+    emptyBody: "Add a server or pair a computer to get started.",
     empty: "No devices paired.\nAdd a server or pair a computer to get started.",
   },
   misc: {
@@ -127,6 +131,8 @@ const en = {
   chat: {
     title: "Chat",
     loading: "Loading messages...",
+    emptyTitle: "No messages yet",
+    emptyBody: "Start the conversation below.",
     empty: "No messages yet. Start the conversation!",
     settings: "Settings",
   },
@@ -137,6 +143,7 @@ const en = {
   pickers: {
     searchModels: "Search models...",
     noModels: "No models found",
+    noModelsBody: "Try a different search.",
     selectAgent: "Select Mode",
     selectModel: "Select Model",
   },
