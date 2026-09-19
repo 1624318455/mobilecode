@@ -22,13 +22,22 @@ export function useSessions(server: Server, projectPath?: string) {
     select: (data) => {
       return data
         .filter((s) => !s.parentID && !s.time.archived)
-        .map((s) => ({
-          id: s.id,
-          title: s.title || `Session ${s.id.slice(0, 8)}`,
-          updatedAt: new Date(s.time.updated).toISOString(),
-          projectID: s.projectID,
-          directory: s.directory,
-        }));
+        .map((s) => {
+          const runtime = s as typeof s & {
+            agent?: string;
+            model?: { id?: string };
+          };
+
+          return {
+            id: s.id,
+            title: s.title || `Session ${s.id.slice(0, 8)}`,
+            updatedAt: new Date(s.time.updated).toISOString(),
+            projectID: s.projectID,
+            directory: s.directory,
+            agent: runtime.agent || undefined,
+            modelName: runtime.model?.id || undefined,
+          };
+        });
     },
   });
 }

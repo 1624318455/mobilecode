@@ -59,3 +59,42 @@ export const SkeletonRows = memo(function SkeletonRows({
     </View>
   );
 });
+
+function usePulse() {
+  const theme = useAppTheme();
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withRepeat(withTiming(1, { duration: 1000 }), -1, true);
+  }, [progress]);
+
+  const animated = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 1], [0.35, 0.7]),
+  }));
+
+  return {
+    animated,
+    boneColor: { backgroundColor: theme.colors.surfaceContainerHighest },
+  };
+}
+
+export const BubbleSkeleton = memo(function BubbleSkeleton() {
+  const { animated, boneColor } = usePulse();
+
+  return (
+    <View className="flex-1 py-4 gap-3">
+      <Animated.View
+        className="self-start rounded-2xl h-16"
+        style={[{ width: "75%" }, boneColor, animated]}
+      />
+      <Animated.View
+        className="self-end rounded-2xl h-10"
+        style={[{ width: "55%" }, boneColor, animated]}
+      />
+      <Animated.View
+        className="self-start rounded-2xl h-24"
+        style={[{ width: "85%" }, boneColor, animated]}
+      />
+    </View>
+  );
+});

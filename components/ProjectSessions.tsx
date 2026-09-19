@@ -151,6 +151,8 @@ export function ProjectSessions({ project, server }: ProjectSessionsProps) {
           key={session.id}
           title={session.title}
           updatedAt={session.updatedAt}
+          agent={session.agent}
+          modelName={session.modelName}
           onPress={() =>
             router.push(
               `/server/${serverId}/project/${project.id}/session/${session.id}`,

@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { MessageSquare } from "lucide-react-native";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { SessionBadges } from "@/components/SessionBadges";
 import { formatTimeAgo } from "@/lib/formatTimeAgo";
 import { useT } from "@/lib/i18n";
 
@@ -9,9 +10,11 @@ interface SessionCardProps {
   title: string;
   updatedAt: string;
   onPress: () => void;
+  agent?: string;
+  modelName?: string;
 }
 
-export function SessionCard({ title, updatedAt, onPress }: SessionCardProps) {
+export function SessionCard({ title, updatedAt, onPress, agent, modelName }: SessionCardProps) {
   const theme = useAppTheme();
   const { t } = useT();
 
@@ -36,6 +39,7 @@ export function SessionCard({ title, updatedAt, onPress }: SessionCardProps) {
           >
             {title}
           </Text>
+          <SessionBadges agent={agent} modelName={modelName} />
           <Text
             className="text-sm mt-0.5"
             style={{ color: theme.colors.onSurfaceVariant }}

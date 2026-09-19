@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ChatMessage } from "@/components/ChatMessage";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { EmptyState } from "@/components/EmptyState";
+import { BubbleSkeleton } from "@/components/SkeletonRows";
 import { useT } from "@/lib/i18n";
 import { MentionedFile, MessageInput } from "@/components/MessageInput";
 import { PermissionBanner } from "@/components/PermissionBanner";
@@ -305,15 +306,7 @@ export function SessionChatContent({
               contentContainerStyle={{ padding: 16, flexGrow: 1 }}
               ListEmptyComponent={
                 isLoading ? (
-                  <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color={theme.colors.primary} />
-                    <Text
-                      className="mt-3"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      {t("chat.loading")}
-                    </Text>
-                  </View>
+                  <BubbleSkeleton />
                 ) : error ? (
                   <View className="flex-1 items-center justify-center p-4">
                     <Text

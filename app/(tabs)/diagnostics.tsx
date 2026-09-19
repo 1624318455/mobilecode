@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { SkeletonRows } from "@/components/SkeletonRows";
 import { GatewayState, useDiagnostics } from "@/hooks/useDiagnostics";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/stores";
@@ -90,6 +91,9 @@ export default function DiagnosticsScreen() {
               </Text>
             </Pressable>
           </View>
+        )}
+        {servers.length > 0 && Object.keys(checks).length === 0 && (
+          <SkeletonRows count={servers.length} />
         )}
         {servers.map((server) => {
           const check = checks[server.id];
