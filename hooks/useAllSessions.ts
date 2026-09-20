@@ -139,7 +139,7 @@ export function useAllSessions(servers: Server[]) {
       },
     })),
     combine: (results) => {
-      return results.flatMap((query, index) => {
+      const items = results.flatMap((query, index) => {
         if (!query.data) {
           return [];
         }
@@ -149,11 +149,16 @@ export function useAllSessions(servers: Server[]) {
           project,
         }));
       });
+      const isLoading = results.some(
+        (q) => q.isLoading || q.isFetching,
+      );
+
+      return { items, isLoading };
     },
   });
 
   const { recentSessions, isLoading, fetchInfo } = useQueries({
-    queries: directories.map(({ server, project }) => ({
+    queries: directories.items.map(({ server, project }) => ({
       queryKey: ["server", server.url, "project", project.path, "sessions"],
       queryFn: async () => {
         const client = createClient({
@@ -195,17 +200,19 @@ export function useAllSessions(servers: Server[]) {
         );
 
       const fetchInfo: SessionFetchInfo[] = results.map((query, index) => ({
-        serverId: directories[index]?.server.id || "",
-        serverName: directories[index]?.server.name || "",
+        serverId: directories.items[index]?.server.id || "",
+        serverName: directories.items[index]?.server.name || "",
         fetched: query.data?.fetched ?? 0,
-        shown: query.data?.items.length ?? 0,        error: query.error
+        shown: query.data?.items.length ?? 0,
+        error: query.error
           ? query.error instanceof Error
             ? query.error.message
             : String(query.error)
           : null,
       }));
 
-      const isLoading = results.some((q) => q.isLoading);
+      const phase2Loading = results.some((q) => q.isLoading || q.isFetching);
+      const isLoading = directories.isLoading || phase2Loading;
 
       return { recentSessions, isLoading, fetchInfo };
     },

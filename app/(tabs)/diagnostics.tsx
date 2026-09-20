@@ -130,19 +130,27 @@ export default function DiagnosticsScreen() {
                       : t("diagnostics.notChecked")}
                   </Text>
                   {(() => {
-                    const info = fetchInfo.find((f) => f.serverId === server.id);
+                    const infos = fetchInfo.filter(
+                      (f) => f.serverId === server.id,
+                    );
 
-                    if (!info) {
+                    if (infos.length === 0) {
                       return null;
                     }
+
+                    const shown = infos.reduce((n, f) => n + f.shown, 0);
+                    const fetched = infos.reduce((n, f) => n + f.fetched, 0);
+                    const errors = infos
+                      .map((f) => f.error)
+                      .filter((e): e is string => !!e);
 
                     return (
                       <Text
                         className="text-xs mt-0.5"
                         style={{ color: theme.colors.onSurfaceVariant }}
                       >
-                        sessions {info.shown}/{info.fetched}
-                        {info.error ? ` • ${info.error}` : ""}
+                        sessions {shown}/{fetched} · {infos.length} dirs
+                        {errors.length > 0 ? ` • ${errors[0]}` : ""}
                       </Text>
                     );
                   })()}
