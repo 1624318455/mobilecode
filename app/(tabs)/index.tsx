@@ -28,7 +28,7 @@ export default function RecentsScreen() {
   const servers = useAppStore((s) => s.servers);
   const startupBehavior = useAppStore((s) => s.startupBehavior);
   const lastServerId = useAppStore((s) => s.lastServerId);
-  const { recentSessions, isLoading, listError } = useAllSessions(servers);
+  const { recentSessions, isLoading, listError, fetchInfo } = useAllSessions(servers);
   const redirected = useRef(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [scrolled, setScrolled] = useState(false);
@@ -101,7 +101,13 @@ export default function RecentsScreen() {
   }, [isLoading, listError, totalCount, servers.length, queryClient]);
 
   const handleEndReached = useCallback(() => {
-    setVisibleCount((c) => Math.min(c + PAGE_STEP, totalCount));
+    // onEndReached fires on mount when content is shorter than the viewport
+    // (e.g. an empty list): never let it clamp the count down to zero.
+    if (totalCount === 0) {
+      return;
+    }
+
+    setVisibleCount((c) => Math.min(Math.max(c, PAGE_SIZE) + PAGE_STEP, totalCount));
   }, [totalCount]);
 
   const handleRetry = useCallback(() => {
@@ -111,7 +117,10 @@ export default function RecentsScreen() {
     });
   }, [queryClient]);
 
-  const visibleSessions = recentSessions.slice(0, visibleCount);
+  const visibleSessions = recentSessions.slice(
+    0,
+    Math.max(visibleCount, PAGE_SIZE),
+  );
 
   const renderItem = useCallback(
     ({ item, index }: { item: RecentSession; index: number }) => (

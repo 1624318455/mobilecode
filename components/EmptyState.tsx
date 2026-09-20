@@ -20,6 +20,7 @@ interface EmptyStateProps {
   body: string;
   actionLabel?: string;
   onAction?: () => void;
+  debug?: string | null;
 }
 
 export const EmptyState = memo(function EmptyState({
@@ -28,6 +29,7 @@ export const EmptyState = memo(function EmptyState({
   body,
   actionLabel,
   onAction,
+  debug,
 }: EmptyStateProps) {
   const theme = useAppTheme();
   const Icon = KIND_ICON[kind];
@@ -56,6 +58,14 @@ export const EmptyState = memo(function EmptyState({
           {actionLabel}
         </Button>
       )}
+      {debug ? (
+        <Text
+          className="text-xs text-center mt-4"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
+          {debug}
+        </Text>
+      ) : null}
     </View>
   );
 });
