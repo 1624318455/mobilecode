@@ -32,30 +32,6 @@ export interface DirectoryProject {
   path: string;
 }
 
-export function discoverDirectoryProjects(sessions: Session[]): DirectoryProject[] {
-  const dirs = new Map<string, DirectoryProject>();
-
-  for (const s of sessions) {
-    const raw = sessionDirectory(s);
-
-    if (!raw || s.time?.archived || dirs.has(raw)) {
-      continue;
-    }
-
-    dirs.set(raw, {
-      id: encodeURIComponent(raw),
-      name: basenameOf(raw),
-      path: raw,
-    });
-  }
-
-  return [...dirs.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export function directoriesQueryKey(serverUrl: string) {
-  return ["server", serverUrl, "directories"] as const;
-}
-
 export function basenameOf(directory: string): string {
   const normalized = directory.replace(/\\/g, "/").replace(/\/+$/, "");
   const base = normalized.split("/").pop();
@@ -115,14 +91,45 @@ function normalizeSession(server: Server, s: Session): RecentSession | null {
   };
 }
 
-// Two-phase aggregation that reads from the SAME per-directory endpoint the
-// device page uses, so Recents, counts, and ServerContent always agree:
-//  1. one global session.list per server to discover directories,
-//  2. one session.list({ directory }) per directory for the real rows.
+export function directoriesQueryKey(serverUrl: string) {
+  return ["server", serverUrl, "directories"] as const;
+}
+
+export function discoverDirectoryProjects(sessions: Session[]): DirectoryProject[] {
+  const dirs = new Map<string, DirectoryProject>();
+
+  for (const s of sessions) {
+    const raw = sessionDirectory(s);
+
+    if (!raw || s.time?.archived || dirs.has(raw)) {
+      continue;
+    }
+
+    dirs.set(raw, {
+      id: encodeURIComponent(raw),
+      name: basenameOf(raw),
+      path: raw,
+    });
+  }
+
+  return [...dirs.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function errorText(error: unknown): string | null {
+  if (!error) {
+    return null;
+  }
+
+  return error instanceof Error ? error.message : String(error);
+}
+
+// Single-phase aggregation: one global session.list per server, grouped
+// client-side. No cascade, no cross-hook key sharing, no false-empty states.
+// (ServerContent keeps its own per-directory queries for the detail page.)
 export function useAllSessions(servers: Server[]) {
-  const directories = useQueries({
+  const { recentSessions, isLoading, fetchInfo, listError } = useQueries({
     queries: servers.map((server) => ({
-      queryKey: directoriesQueryKey(server.url),
+      queryKey: ["server", server.url, "sessions"],
       queryFn: async () => {
         const client = createClient({
           baseUrl: server.url,
@@ -135,50 +142,9 @@ export function useAllSessions(servers: Server[]) {
           throw result.error;
         }
 
-        return discoverDirectoryProjects(result.data || []);
-      },
-      retry: 2,
-    })),
-    combine: (results) => {
-      const items = results.flatMap((query, index) => {
-        if (!query.data) {
-          return [];
-        }
-
-        return query.data.map((project) => ({
-          server: servers[index],
-          project,
-        }));
-      });
-      const isLoading = results.some(
-        (q) => q.isLoading || q.isFetching,
-      );
-      const error = results.find((q) => q.error)?.error || null;
-
-      return { items, isLoading, error };
-    },
-  });
-
-  const { recentSessions, isLoading, fetchInfo, listError } = useQueries({
-    queries: directories.items.map(({ server, project }) => ({
-      queryKey: ["server", server.url, "project", project.path, "sessions"],
-      queryFn: async () => {
-        const client = createClient({
-          baseUrl: server.url,
-          directory: project.path,
-          username: server.username,
-          password: server.password,
-        });
-        const result = await client.session.list({
-          directory: project.path,
-        });
-
-        if (result.error) {
-          throw result.error;
-        }
-
         return result.data || [];
       },
+      retry: 2,
       select: (data: Session[]) => {
         const out: RecentSession[] = [];
 
@@ -202,23 +168,18 @@ export function useAllSessions(servers: Server[]) {
         );
 
       const fetchInfo: SessionFetchInfo[] = results.map((query, index) => ({
-        serverId: directories.items[index]?.server.id || "",
-        serverName: directories.items[index]?.server.name || "",
+        serverId: servers[index]?.id || "",
+        serverName: servers[index]?.name || "",
         fetched: query.data?.fetched ?? 0,
         shown: query.data?.items.length ?? 0,
-        error: query.error
-          ? query.error instanceof Error
-            ? query.error.message
-            : String(query.error)
-          : null,
+        error: errorText(query.error),
       }));
 
-      const phase2Loading = results.some((q) => q.isLoading || q.isFetching);
-      const phase2Error =
-        results.find((q) => q.error)?.error || directories.error || null;
-      const isLoading = directories.isLoading || phase2Loading;
+      const pending = results.some((q) => q.isLoading || q.isFetching);
+      const failed = results.find((q) => q.error)?.error || null;
+      const isLoading = pending;
 
-      return { recentSessions, isLoading, fetchInfo, listError: phase2Error };
+      return { recentSessions, isLoading, fetchInfo, listError: failed };
     },
   });
 
