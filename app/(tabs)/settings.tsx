@@ -33,7 +33,11 @@ export default function SettingsScreen() {
   const setLocalePref = useAppStore((s) => s.setLocalePref);
   const localeDebug = resolveLocaleDebug(localePref);
   const { recentSessions } = useAllSessions(servers);
-  const projectCount = new Set(recentSessions.map((s) => s.projectId)).size;
+  // projectID is unreliable (server often stamps everything "global"),
+  // so count distinct directories instead.
+  const projectCount = new Set(
+    recentSessions.map((s) => s.directory || s.projectId),
+  ).size;
 
   const version = Application.nativeApplicationVersion || "Unknown";
   const buildNumber = Application.nativeBuildVersion || "Unknown";
