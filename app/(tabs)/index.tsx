@@ -32,6 +32,14 @@ export default function RecentsScreen() {
   const redirected = useRef(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [scrolled, setScrolled] = useState(false);
+  // An empty snapshot with no error is suspicious (server index may not have
+  // been ready on first hit): revalidate once automatically so the user never
+  // has to pull-to-refresh to fix it. Reset per server set.
+  const revalidated = useRef(false);
+
+  useEffect(() => {
+    revalidated.current = false;
+  }, [servers.length]);
 
   // Warm the provider catalog (6MB on some servers) while the user is still
   // on the dashboard, so opening a session finds models already cached.
@@ -70,6 +78,27 @@ export default function RecentsScreen() {
   }, [servers, queryClient]);
 
   const totalCount = recentSessions.length;
+
+  useEffect(() => {
+    if (
+      isLoading ||
+      listError ||
+      totalCount > 0 ||
+      servers.length === 0 ||
+      revalidated.current
+    ) {
+      return;
+    }
+
+    revalidated.current = true;
+    const id = setTimeout(() => {
+      queryClient.invalidateQueries({
+        queryKey: ["server"],
+      });
+    }, 2500);
+
+    return () => clearTimeout(id);
+  }, [isLoading, listError, totalCount, servers.length, queryClient]);
 
   const handleEndReached = useCallback(() => {
     setVisibleCount((c) => Math.min(c + PAGE_STEP, totalCount));

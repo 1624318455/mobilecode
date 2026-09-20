@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { Trash2 } from "lucide-react-native";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Alert,
   FlatList,
@@ -34,6 +34,22 @@ export function ServerContent({ server }: ServerContentProps) {
     isFetching,
     error,
   } = useServerDirectories(server);
+  const revalidated = useRef(false);
+
+  useEffect(() => {
+    if (isLoading || isFetching || error || projects.length > 0 || revalidated.current) {
+      return;
+    }
+
+    revalidated.current = true;
+    const id = setTimeout(() => {
+      queryClient.invalidateQueries({
+        queryKey: ["server", server.url],
+      });
+    }, 2500);
+
+    return () => clearTimeout(id);
+  }, [isLoading, isFetching, error, projects.length, queryClient, server.url]);
 
   useEffect(() => {
     navigation.setOptions({
