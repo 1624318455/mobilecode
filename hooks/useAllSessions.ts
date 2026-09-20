@@ -26,6 +26,36 @@ export interface SessionFetchInfo {
   error: string | null;
 }
 
+export interface DirectoryProject {
+  id: string;
+  name: string;
+  path: string;
+}
+
+export function discoverDirectoryProjects(sessions: Session[]): DirectoryProject[] {
+  const dirs = new Map<string, DirectoryProject>();
+
+  for (const s of sessions) {
+    const raw = sessionDirectory(s);
+
+    if (!raw || s.time?.archived || dirs.has(raw)) {
+      continue;
+    }
+
+    dirs.set(raw, {
+      id: encodeURIComponent(raw),
+      name: basenameOf(raw),
+      path: raw,
+    });
+  }
+
+  return [...dirs.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function directoriesQueryKey(serverUrl: string) {
+  return ["server", serverUrl, "directories"] as const;
+}
+
 export function basenameOf(directory: string): string {
   const normalized = directory.replace(/\\/g, "/").replace(/\/+$/, "");
   const base = normalized.split("/").pop();
@@ -92,7 +122,7 @@ function normalizeSession(server: Server, s: Session): RecentSession | null {
 export function useAllSessions(servers: Server[]) {
   const directories = useQueries({
     queries: servers.map((server) => ({
-      queryKey: ["server", server.url, "directories"],
+      queryKey: directoriesQueryKey(server.url),
       queryFn: async () => {
         const client = createClient({
           baseUrl: server.url,
@@ -105,17 +135,7 @@ export function useAllSessions(servers: Server[]) {
           throw result.error;
         }
 
-        const dirs = new Map<string, string>();
-
-        for (const s of result.data || []) {
-          const dir = sessionDirectory(s);
-
-          if (dir && !s.time?.archived && !dirs.has(dir)) {
-            dirs.set(dir, dir);
-          }
-        }
-
-        return [...dirs.values()];
+        return discoverDirectoryProjects(result.data || []);
       },
     })),
     combine: (results) => {
@@ -124,26 +144,26 @@ export function useAllSessions(servers: Server[]) {
           return [];
         }
 
-        return query.data.map((directory) => ({
+        return query.data.map((project) => ({
           server: servers[index],
-          directory,
+          project,
         }));
       });
     },
   });
 
   const { recentSessions, isLoading, fetchInfo } = useQueries({
-    queries: directories.map(({ server, directory }) => ({
-      queryKey: ["server", server.url, "project", directory, "sessions"],
+    queries: directories.map(({ server, project }) => ({
+      queryKey: ["server", server.url, "project", project.path, "sessions"],
       queryFn: async () => {
         const client = createClient({
           baseUrl: server.url,
-          directory,
+          directory: project.path,
           username: server.username,
           password: server.password,
         });
         const result = await client.session.list({
-          directory,
+          directory: project.path,
         });
 
         if (result.error) {
@@ -178,8 +198,7 @@ export function useAllSessions(servers: Server[]) {
         serverId: directories[index]?.server.id || "",
         serverName: directories[index]?.server.name || "",
         fetched: query.data?.fetched ?? 0,
-        shown: query.data?.items.length ?? 0,
-        error: query.error
+        shown: query.data?.items.length ?? 0,        error: query.error
           ? query.error instanceof Error
             ? query.error.message
             : String(query.error)

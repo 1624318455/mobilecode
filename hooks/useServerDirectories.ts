@@ -1,59 +1,27 @@
-import { useQueries } from "@tanstack/react-query";
-import { Session } from "@opencode-ai/sdk/v2";
+import { useQuery } from "@tanstack/react-query";
 
-import { basenameOf } from "@/hooks/useAllSessions";
 import { createClient } from "@/lib/opencode-client";
+import { directoriesQueryKey, discoverDirectoryProjects } from "@/hooks/useAllSessions";
 import { Server } from "@/stores";
 
-export interface DirectoryProject {
-  id: string;
-  name: string;
-  path: string;
-}
-
-function discoverDirectories(sessions: Session[]): DirectoryProject[] {
-  const dirs = new Map<string, DirectoryProject>();
-
-  for (const s of sessions) {
-    const raw = (s.directory as string | undefined) || "";
-
-    if (!raw || s.time?.archived) {
-      continue;
-    }
-
-    if (!dirs.has(raw)) {
-      dirs.set(raw, {
-        id: encodeURIComponent(raw),
-        name: basenameOf(raw),
-        path: raw,
-      });
-    }
-  }
-
-  return [...dirs.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
+// Shares the ["server", url, "directories"] cache entry with useAllSessions
+// phase 1 on purpose: same key, same DirectoryProject[] shape, one fetch.
 export function useServerDirectories(server: Server) {
-  return useQueries({
-    queries: [
-      {
-        queryKey: ["server", server.url, "directories"],
-        queryFn: async () => {
-          const client = createClient({
-            baseUrl: server.url,
-            username: server.username,
-            password: server.password,
-          });
-          const result = await client.session.list();
+  return useQuery({
+    queryKey: directoriesQueryKey(server.url),
+    queryFn: async () => {
+      const client = createClient({
+        baseUrl: server.url,
+        username: server.username,
+        password: server.password,
+      });
+      const result = await client.session.list();
 
-          if (result.error) {
-            throw result.error;
-          }
+      if (result.error) {
+        throw result.error;
+      }
 
-          return discoverDirectories(result.data || []);
-        },
-      },
-    ],
-    combine: (results) => results[0],
+      return discoverDirectoryProjects(result.data || []);
+    },
   });
 }
