@@ -137,6 +137,7 @@ export function useAllSessions(servers: Server[]) {
 
         return discoverDirectoryProjects(result.data || []);
       },
+      retry: 2,
     })),
     combine: (results) => {
       const items = results.flatMap((query, index) => {
@@ -152,12 +153,13 @@ export function useAllSessions(servers: Server[]) {
       const isLoading = results.some(
         (q) => q.isLoading || q.isFetching,
       );
+      const error = results.find((q) => q.error)?.error || null;
 
-      return { items, isLoading };
+      return { items, isLoading, error };
     },
   });
 
-  const { recentSessions, isLoading, fetchInfo } = useQueries({
+  const { recentSessions, isLoading, fetchInfo, listError } = useQueries({
     queries: directories.items.map(({ server, project }) => ({
       queryKey: ["server", server.url, "project", project.path, "sessions"],
       queryFn: async () => {
@@ -212,11 +214,13 @@ export function useAllSessions(servers: Server[]) {
       }));
 
       const phase2Loading = results.some((q) => q.isLoading || q.isFetching);
+      const phase2Error =
+        results.find((q) => q.error)?.error || directories.error || null;
       const isLoading = directories.isLoading || phase2Loading;
 
-      return { recentSessions, isLoading, fetchInfo };
+      return { recentSessions, isLoading, fetchInfo, listError: phase2Error };
     },
   });
 
-  return { recentSessions, isLoading, fetchInfo };
+  return { recentSessions, isLoading, fetchInfo, listError };
 }

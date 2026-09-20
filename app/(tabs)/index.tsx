@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
+  Pressable,
   RefreshControl,
   Text,
   View,
@@ -27,7 +28,7 @@ export default function RecentsScreen() {
   const servers = useAppStore((s) => s.servers);
   const startupBehavior = useAppStore((s) => s.startupBehavior);
   const lastServerId = useAppStore((s) => s.lastServerId);
-  const { recentSessions, isLoading } = useAllSessions(servers);
+  const { recentSessions, isLoading, listError } = useAllSessions(servers);
   const redirected = useRef(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [scrolled, setScrolled] = useState(false);
@@ -74,6 +75,13 @@ export default function RecentsScreen() {
     setVisibleCount((c) => Math.min(c + PAGE_STEP, totalCount));
   }, [totalCount]);
 
+  const handleRetry = useCallback(() => {
+    setVisibleCount(PAGE_SIZE);
+    queryClient.invalidateQueries({
+      queryKey: ["server"],
+    });
+  }, [queryClient]);
+
   const visibleSessions = recentSessions.slice(0, visibleCount);
 
   const renderItem = useCallback(
@@ -102,6 +110,27 @@ export default function RecentsScreen() {
       ListEmptyComponent={
         isLoading ? (
           <SkeletonRows count={5} />
+        ) : listError ? (
+          <View className="flex-1 items-center justify-center py-12 px-8">
+            <Text
+              className="text-center"
+              style={{ color: theme.colors.error }}
+            >
+              {listError instanceof Error ? listError.message : String(listError)}
+            </Text>
+            <Pressable
+              onPress={handleRetry}
+              className="rounded-[28px] px-6 py-3 mt-4"
+              style={{ backgroundColor: theme.colors.primary }}
+            >
+              <Text
+                className="font-semibold"
+                style={{ color: theme.colors.onPrimary }}
+              >
+                {t("diagnostics.retry")}
+              </Text>
+            </Pressable>
+          </View>
         ) : (
           <EmptyState
             kind="sessions"
