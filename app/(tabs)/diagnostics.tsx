@@ -12,6 +12,7 @@ import {
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { SkeletonRows } from "@/components/SkeletonRows";
 import { GatewayState, useDiagnostics } from "@/hooks/useDiagnostics";
+import { useAllSessions } from "@/hooks/useAllSessions";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/stores";
 import { useWsRules } from "@/stores/diagnostics";
@@ -26,6 +27,7 @@ export default function DiagnosticsScreen() {
     unknown: theme.colors.onSurfaceVariant,
   };
   const servers = useAppStore((s) => s.servers);
+  const { fetchInfo } = useAllSessions(servers);
   const allowedPaths = useWsRules((s) => s.allowedPaths);
   const allowPath = useWsRules((s) => s.allowPath);
   const removePath = useWsRules((s) => s.removePath);
@@ -127,6 +129,23 @@ export default function DiagnosticsScreen() {
                       ? `${check.detail}${check.latencyMs !== null ? ` • ${check.latencyMs}ms` : ""}`
                       : t("diagnostics.notChecked")}
                   </Text>
+                  {(() => {
+                    const info = fetchInfo.find((f) => f.serverId === server.id);
+
+                    if (!info) {
+                      return null;
+                    }
+
+                    return (
+                      <Text
+                        className="text-xs mt-0.5"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        sessions {info.shown}/{info.fetched}
+                        {info.error ? ` • ${info.error}` : ""}
+                      </Text>
+                    );
+                  })()}
                 </View>
                 <Pressable
                   onPress={() => checkServer(server)}

@@ -339,6 +339,12 @@ export function MessageInput({
             multiline
             maxLength={10000}
             submitBehavior="newline"
+            blurOnSubmit={false}
+            returnKeyType="default"
+            // Swallow any keyboard submit event: Enter must always be a
+            // newline in this chat input. Sending happens only via the
+            // send button (handleSend).
+            onSubmitEditing={() => {}}
           >
             <Text>
               {segments.map((seg, i) => (

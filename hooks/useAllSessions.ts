@@ -18,6 +18,14 @@ export interface RecentSession {
   modelName?: string;
 }
 
+export interface SessionFetchInfo {
+  serverId: string;
+  serverName: string;
+  fetched: number;
+  shown: number;
+  error: string | null;
+}
+
 export function basenameOf(directory: string): string {
   const normalized = directory.replace(/\\/g, "/").replace(/\/+$/, "");
   const base = normalized.split("/").pop();
@@ -27,6 +35,11 @@ export function basenameOf(directory: string): string {
 
 interface SessionLocation {
   location?: { directory?: string };
+}
+
+interface SessionRuntime {
+  agent?: string;
+  model?: { id?: string };
 }
 
 function sessionDirectory(s: Session): string {
@@ -41,11 +54,6 @@ function sessionDirectory(s: Session): string {
   }
 
   return "";
-}
-
-interface SessionRuntime {
-  agent?: string;
-  model?: { id?: string };
 }
 
 function normalizeSession(server: Server, s: Session): RecentSession | null {
@@ -77,10 +85,14 @@ function normalizeSession(server: Server, s: Session): RecentSession | null {
   };
 }
 
+// Two-phase aggregation that reads from the SAME per-directory endpoint the
+// device page uses, so Recents, counts, and ServerContent always agree:
+//  1. one global session.list per server to discover directories,
+//  2. one session.list({ directory }) per directory for the real rows.
 export function useAllSessions(servers: Server[]) {
-  const { recentSessions, isLoading } = useQueries({
+  const directories = useQueries({
     queries: servers.map((server) => ({
-      queryKey: ["server", server.url, "sessions"],
+      queryKey: ["server", server.url, "directories"],
       queryFn: async () => {
         const client = createClient({
           baseUrl: server.url,
@@ -88,6 +100,51 @@ export function useAllSessions(servers: Server[]) {
           password: server.password,
         });
         const result = await client.session.list();
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        const dirs = new Map<string, string>();
+
+        for (const s of result.data || []) {
+          const dir = sessionDirectory(s);
+
+          if (dir && !s.time?.archived && !dirs.has(dir)) {
+            dirs.set(dir, dir);
+          }
+        }
+
+        return [...dirs.values()];
+      },
+    })),
+    combine: (results) => {
+      return results.flatMap((query, index) => {
+        if (!query.data) {
+          return [];
+        }
+
+        return query.data.map((directory) => ({
+          server: servers[index],
+          directory,
+        }));
+      });
+    },
+  });
+
+  const { recentSessions, isLoading, fetchInfo } = useQueries({
+    queries: directories.map(({ server, directory }) => ({
+      queryKey: ["server", server.url, "project", directory, "sessions"],
+      queryFn: async () => {
+        const client = createClient({
+          baseUrl: server.url,
+          directory,
+          username: server.username,
+          password: server.password,
+        });
+        const result = await client.session.list({
+          directory,
+        });
 
         if (result.error) {
           throw result.error;
@@ -106,22 +163,34 @@ export function useAllSessions(servers: Server[]) {
           }
         }
 
-        return out;
+        return { items: out, fetched: (data as unknown[]).length };
       },
     })),
     combine: (results) => {
       const recentSessions = results
-        .flatMap((query) => query.data || [])
+        .flatMap((query) => query.data?.items || [])
         .sort(
           (a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
         );
 
+      const fetchInfo: SessionFetchInfo[] = results.map((query, index) => ({
+        serverId: directories[index]?.server.id || "",
+        serverName: directories[index]?.server.name || "",
+        fetched: query.data?.fetched ?? 0,
+        shown: query.data?.items.length ?? 0,
+        error: query.error
+          ? query.error instanceof Error
+            ? query.error.message
+            : String(query.error)
+          : null,
+      }));
+
       const isLoading = results.some((q) => q.isLoading);
 
-      return { recentSessions, isLoading };
+      return { recentSessions, isLoading, fetchInfo };
     },
   });
 
-  return { recentSessions, isLoading };
+  return { recentSessions, isLoading, fetchInfo };
 }
