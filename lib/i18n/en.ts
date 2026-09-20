@@ -57,6 +57,7 @@ const en = {
     servers: "Servers",
     projects: "Projects",
     sessions: "Sessions",
+    sessionsCount: "{n} sessions",
     startup: "Startup",
     openLast: "Open last computer",
     openLastDesc: "Jump straight into the last used device",

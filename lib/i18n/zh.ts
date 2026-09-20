@@ -59,6 +59,7 @@ const zh: Dict = {
     servers: "服务器",
     projects: "项目",
     sessions: "会话",
+    sessionsCount: "{n} 条",
     startup: "启动行为",
     openLast: "直达上次电脑",
     openLastDesc: "每次启动直接进入上次使用的设备",

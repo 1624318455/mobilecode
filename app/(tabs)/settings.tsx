@@ -129,12 +129,15 @@ export default function SettingsScreen() {
               borderBottomColor: theme.colors.outlineVariant,
             }}
           >
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>
+            <Text
+              style={{ color: theme.colors.onSurfaceVariant, flexShrink: 1 }}
+              numberOfLines={1}
+            >
               {t("settings.servers")}
             </Text>
             <Text
               className="font-medium"
-              style={{ color: theme.colors.onSurface }}
+              style={{ color: theme.colors.onSurface, flexShrink: 0 }}
             >
               {servers.length}
             </Text>
@@ -146,21 +149,31 @@ export default function SettingsScreen() {
               borderBottomColor: theme.colors.outlineVariant,
             }}
           >
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>{t("settings.projects")}</Text>
+            <Text
+              style={{ color: theme.colors.onSurfaceVariant, flexShrink: 1 }}
+              numberOfLines={1}
+            >
+              {t("settings.projects")}
+            </Text>
             <Text
               className="font-medium"
-              style={{ color: theme.colors.onSurface }}
+              style={{ color: theme.colors.onSurface, flexShrink: 0 }}
             >
               {projectCount}
             </Text>
           </View>
           <View className="flex-row justify-between py-2">
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>{t("settings.sessions")}</Text>
+            <Text
+              style={{ color: theme.colors.onSurfaceVariant, flexShrink: 1 }}
+              numberOfLines={1}
+            >
+              {t("settings.sessions")}
+            </Text>
             <Text
               className="font-medium"
-              style={{ color: theme.colors.onSurface }}
+              style={{ color: theme.colors.onSurface, flexShrink: 0 }}
             >
-              {recentSessions.length}
+              {t("settings.sessionsCount", { n: recentSessions.length })}
             </Text>
           </View>
         </View>

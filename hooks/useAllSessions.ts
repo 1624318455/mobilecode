@@ -23,6 +23,8 @@ export interface SessionFetchInfo {
   serverName: string;
   fetched: number;
   shown: number;
+  droppedNoTime: number;
+  droppedArchived: number;
   error: string | null;
 }
 
@@ -147,8 +149,20 @@ export function useAllSessions(servers: Server[]) {
       retry: 2,
       select: (data: Session[]) => {
         const out: RecentSession[] = [];
+        let droppedNoTime = 0;
+        let droppedArchived = 0;
 
         for (const s of data) {
+          if (s.time?.archived) {
+            droppedArchived++;
+            continue;
+          }
+
+          if (!s.time?.updated) {
+            droppedNoTime++;
+            continue;
+          }
+
           const item = normalizeSession(server, s);
 
           if (item) {
@@ -156,7 +170,12 @@ export function useAllSessions(servers: Server[]) {
           }
         }
 
-        return { items: out, fetched: (data as unknown[]).length };
+        return {
+          items: out,
+          fetched: (data as unknown[]).length,
+          droppedNoTime,
+          droppedArchived,
+        };
       },
     })),
     combine: (results) => {
@@ -172,6 +191,8 @@ export function useAllSessions(servers: Server[]) {
         serverName: servers[index]?.name || "",
         fetched: query.data?.fetched ?? 0,
         shown: query.data?.items.length ?? 0,
+        droppedNoTime: query.data?.droppedNoTime ?? 0,
+        droppedArchived: query.data?.droppedArchived ?? 0,
         error: errorText(query.error),
       }));
 

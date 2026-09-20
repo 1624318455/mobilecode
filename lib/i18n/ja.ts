@@ -59,6 +59,7 @@ const ja: Dict = {
     servers: "サーバー",
     projects: "プロジェクト",
     sessions: "セッション",
+    sessionsCount: "{n} 件",
     startup: "起動動作",
     openLast: "前回の PC を開く",
     openLastDesc: "起動時に前回使用したデバイスへ直接移動",
