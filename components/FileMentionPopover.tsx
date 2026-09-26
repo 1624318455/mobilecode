@@ -46,7 +46,11 @@ export function FileMentionPopover({
     return (
       <View
         className="rounded-[28px] p-3"
-        style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+        style={{
+          backgroundColor: theme.colors.surface,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+        }}
       >
         <Text
           className="text-sm"
@@ -62,7 +66,9 @@ export function FileMentionPopover({
     <View
       className="rounded-[28px] overflow-hidden max-h-48"
       style={{
-        backgroundColor: theme.colors.surfaceContainerHigh,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
         elevation: 3,
       }}
     >

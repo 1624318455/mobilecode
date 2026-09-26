@@ -9,6 +9,7 @@ import { SignatureEntrance } from "@/components/SignatureEntrance";
 import { formatTimeAgo } from "@/lib/formatTimeAgo";
 import { useT } from "@/lib/i18n";
 import { RecentSession } from "@/hooks/useAllSessions";
+import { unreadKey, useUnreadStore } from "@/stores/unread";
 
 interface RecentRowProps {
   item: RecentSession;
@@ -20,6 +21,9 @@ interface RecentRowProps {
 export const RecentRow = memo(function RecentRow({ item, index, animate = true, showServer = true }: RecentRowProps) {
   const theme = useAppTheme();
   const { t } = useT();
+  const showDot = useUnreadStore(
+    (s) => s.dotEnabled && s.items[unreadKey(item.serverId, item.sessionId)] !== undefined,
+  );
 
   const handlePress = useCallback(() => {
     router.push(
@@ -68,6 +72,13 @@ export const RecentRow = memo(function RecentRow({ item, index, animate = true, 
               {formatTimeAgo(item.updatedAt, t)}
             </Text>
           </View>
+          {showDot ? (
+            <View
+              className="w-2 h-2 rounded-full ml-2"
+              style={{ backgroundColor: theme.colors.error }}
+              accessibilityLabel={t("notify.unread")}
+            />
+          ) : null}
         </View>
       </SignatureCard>
     </SignatureEntrance>

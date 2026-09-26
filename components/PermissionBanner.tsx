@@ -13,12 +13,14 @@ import type { PermissionRequest } from "@opencode-ai/sdk/v2";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { createClient } from "@/lib/opencode-client";
+import { isAskStale } from "@/lib/staleAsk";
 import { useT } from "@/lib/i18n";
 import { Server } from "@/stores";
 
 interface PermissionBannerProps {
   request: PermissionRequest;
   server: Server;
+  directory?: string;
 }
 
 function getPermissionLabel(permission: string, t: (key: string) => string): string {
@@ -46,7 +48,7 @@ function getPermissionIcon(permission: string, color: string) {
   return <Shield size={18} color={color} />;
 }
 
-export function PermissionBanner({ request, server }: PermissionBannerProps) {
+export function PermissionBanner({ request, server, directory }: PermissionBannerProps) {
   const theme = useAppTheme();
   const { t } = useT();
   const queryClient = useQueryClient();  const [rejectMessage, setRejectMessage] = useState("");
@@ -56,6 +58,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
     mutationFn: async ({ reply, message }: { reply: "once" | "always" | "reject"; message?: string }) => {
       const client = createClient({
         baseUrl: server.url,
+        directory,
         username: server.username,
         password: server.password,
       });
@@ -102,6 +105,12 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
   const patterns = request.patterns ?? [];
   const metadata = request.metadata ?? {};
   const command = metadata.command as string | undefined;
+  const stale = isAskStale(
+    queryClient,
+    server.url,
+    request.sessionID,
+    request.tool?.messageID,
+  );
 
   return (
     <Animated.View
@@ -109,24 +118,27 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
       exiting={FadeOut.duration(200)}
       className="mx-4 mb-3 overflow-hidden"
       style={{
-        backgroundColor: "#FFFFFF",
+        backgroundColor: theme.colors.surface,
         borderRadius: 28,
         borderWidth: 1,
         borderColor: theme.colors.outlineVariant,
       }}
     >
       {/* Header */}
-      <View className="flex-row items-center gap-2 px-4 pt-3 pb-2">
-        {getPermissionIcon(request.permission, theme.colors.tertiary)}
-        <Text
-          className="text-sm font-semibold flex-1"
-          style={{ color: theme.colors.onTertiaryContainer }}
-        >
-          {getPermissionLabel(request.permission, t)}
-        </Text>
-      </View>
+        <View className="flex-row items-center gap-2 px-4 pt-3 pb-2">
+          {getPermissionIcon(request.permission, theme.colors.tertiary)}
+          <Text
+            className="text-sm font-semibold flex-1"
+            style={{ color: theme.colors.onTertiaryContainer }}
+          >
+            {stale
+              ? t("permission.expired")
+              : getPermissionLabel(request.permission, t)}
+          </Text>
+        </View>
 
       {/* Details */}
+      {!stale ? (
       <View className="px-4 pb-3">
         {command ? (
           <View
@@ -179,10 +191,25 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
           />
         ) : null}
       </View>
+      ) : null}
 
       {/* Actions */}
       <View className="flex-row justify-end gap-2 px-4 pb-3">
-        {isPending ? (
+        {stale ? (
+          <Pressable
+            onPress={handleRejectImmediately}
+            disabled={isPending}
+            className="px-3 py-2 rounded-[28px]"
+            style={{ backgroundColor: theme.colors.surfaceVariant }}
+          >
+            <Text
+              className="text-sm font-medium"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              {t("question.dismiss")}
+            </Text>
+          </Pressable>
+        ) : isPending ? (
           <ActivityIndicator size="small" color={theme.colors.tertiary} />
         ) : (
           <>

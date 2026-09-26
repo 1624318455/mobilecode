@@ -190,7 +190,11 @@ export function SessionSettingsContent({
           <View className="p-4">
             <View
               className="rounded-[28px] p-4 flex-row items-center justify-between"
-              style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderWidth: 1,
+                borderColor: theme.colors.outlineVariant,
+              }}
             >
               <Text
                 className="text-base font-medium"
@@ -208,7 +212,11 @@ export function SessionSettingsContent({
 
             <View
               className="mt-4 rounded-[28px] p-4"
-              style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderWidth: 1,
+                borderColor: theme.colors.outlineVariant,
+              }}
             >
               <Text
                 className="text-base font-medium mb-2"

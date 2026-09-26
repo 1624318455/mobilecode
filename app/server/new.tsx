@@ -242,7 +242,11 @@ export default function AddServerScreen() {
         {/* Help Text */}
         <View
           className="mt-6 p-4 rounded-[28px]"
-          style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <Text
             className="text-sm leading-5"

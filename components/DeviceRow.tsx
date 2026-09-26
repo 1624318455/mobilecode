@@ -9,6 +9,7 @@ import { formatTimeAgo } from "@/lib/formatTimeAgo";
 import { useT } from "@/lib/i18n";
 import { useNotifyColors } from "@/lib/notify";
 import { DeviceRecord, Reachability } from "@/lib/protocol";
+import { useUnreadStore } from "@/stores/unread";
 
 const STATUS_LABELS = (t: (key: string) => string): Record<DeviceRecord["reachable"], string> => ({
   ok: t("device.reachable"),
@@ -35,6 +36,11 @@ export const DeviceRow = memo(function DeviceRow({
   const { t } = useT();
   const notify = useNotifyColors();
   const [menuVisible, setMenuVisible] = useState(false);
+  const unreadCount = useUnreadStore(
+    (s) => Object.values(s.items).filter((e) => e.serverId === record.id).length,
+  );
+  const dotEnabled = useUnreadStore((s) => s.dotEnabled);
+  const showUnread = dotEnabled ? unreadCount : 0;
 
   const dotColor: Record<Reachability, string> = {
     ok: theme.colors.tertiary,
@@ -48,7 +54,11 @@ export const DeviceRow = memo(function DeviceRow({
     <Pressable
       onPress={onOpen}
       className="rounded-[28px] p-4 mb-3 active:opacity-80"
-      style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+      style={{
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
+      }}
     >
       <View className="flex-row items-center">
         <View
@@ -94,6 +104,20 @@ export const DeviceRow = memo(function DeviceRow({
             <RefreshCw size={18} color={theme.colors.primary} />
           )}
         </Pressable>
+        {showUnread > 0 ? (
+          <View
+            className="min-w-6 h-6 rounded-full items-center justify-center px-1.5 mr-1"
+            style={{ backgroundColor: theme.colors.error }}
+            accessibilityLabel={t("notify.unreadCount", { n: showUnread })}
+          >
+            <Text
+              className="text-xs font-semibold"
+              style={{ color: theme.colors.onError }}
+            >
+              {showUnread > 99 ? "99+" : String(showUnread)}
+            </Text>
+          </View>
+        ) : null}
         <Pressable
           onPress={() => {
             setMenuVisible(true);

@@ -47,6 +47,7 @@ const en = {
     copyReport: "Copy redacted report",
     copied: "Report copied",
     reportNote: "The report contains no credentials, tokens, or addresses.",
+    watcher: "Watcher",
     logTitle: "Run log",
     logEmpty: "No entries yet — gateway checks and watcher events will appear here.",
     logClear: "Clear",
@@ -196,6 +197,7 @@ const en = {
     always: "Always",
     allow: "Allow",
     feedbackPh: "Feedback for the agent (optional)...",
+    expired: "Expired — the run already finished",
   },
   question: {
     title: "Question",
@@ -257,6 +259,7 @@ const en = {
   },
   a11y: {
     send: "Send message",
+    autoRead: "Auto read aloud",
     deviceCheck: "Check device now",
     deviceMenu: "Device options",
     sessionSettings: "Session settings",
@@ -309,6 +312,19 @@ const en = {
     connecting: "Connecting",
     connected: "Connected",
     error: "Error",
+  },
+  notify: {
+    title: "Reply alerts",
+    dot: "Unread dots",
+    dotDesc: "Show a red dot on sessions with replies you haven't opened",
+    system: "System notifications",
+    systemDesc: "Pop up a notification when a reply finishes in background",
+    note: "Background alerts need the app running — a force-stopped app cannot listen. Notification permission is asked when enabling.",
+    unread: "Unread replies",
+    unreadCount: "{n} unread",
+    clearAll: "Clear unread",
+    aliveTitle: "MobileCode",
+    aliveMsg: "Listening for session replies",
   },
 };
 

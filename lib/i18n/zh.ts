@@ -49,6 +49,7 @@ const zh: Dict = {
     copyReport: "复制脱敏报告",
     copied: "报告已复制",
     reportNote: "报告不含凭据、令牌与地址。",
+    watcher: "监听",
     logTitle: "运行日志",
     logEmpty: "暂无日志，网关检测与监听事件会出现在这里。",
     logClear: "清空",
@@ -198,6 +199,7 @@ const zh: Dict = {
     always: "总是允许",
     allow: "允许",
     feedbackPh: "给智能体的反馈（选填）…",
+    expired: "已过期——那次运行已经结束了",
   },
   question: {
     title: "提问",
@@ -258,6 +260,7 @@ const zh: Dict = {
   },
   a11y: {
     send: "发送消息",
+    autoRead: "自动朗读",
     deviceCheck: "立即检测设备",
     deviceMenu: "设备选项",
     sessionSettings: "会话设置",
@@ -308,6 +311,19 @@ const zh: Dict = {
     connecting: "连接中",
     connected: "已连接",
     error: "出错",
+  },
+  notify: {
+    title: "回复提醒",
+    dot: "未读红点",
+    dotDesc: "在有未读回复的会话上显示红点",
+    system: "系统通知",
+    systemDesc: "切到后台时回复完成弹出系统通知",
+    note: "后台提醒需要应用在运行——被彻底杀掉后收不到。开启时将请求通知权限。",
+    unread: "有未读回复",
+    unreadCount: "{n} 条未读",
+    clearAll: "全部标为已读",
+    aliveTitle: "MobileCode",
+    aliveMsg: "正在监听会话回复",
   },
 };
 

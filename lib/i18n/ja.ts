@@ -49,6 +49,7 @@ const ja: Dict = {
     copyReport: "匿名レポートをコピー",
     copied: "レポートをコピーしました",
     reportNote: "レポートに認証情報・トークン・アドレスは含まれません。",
+    watcher: "ウォッチャー",
     logTitle: "実行ログ",
     logEmpty: "まだログがありません。ゲートウェイ検査や監視イベントがここに表示されます。",
     logClear: "クリア",
@@ -198,6 +199,7 @@ const ja: Dict = {
     always: "常に許可",
     allow: "許可",
     feedbackPh: "エージェントへのフィードバック（任意）…",
+    expired: "期限切れ——実行は既に終了しました",
   },
   question: {
     title: "質問",
@@ -258,6 +260,7 @@ const ja: Dict = {
   },
   a11y: {
     send: "メッセージを送信",
+    autoRead: "自動読み上げ",
     deviceCheck: "デバイスを今すぐ確認",
     deviceMenu: "デバイスオプション",
     sessionSettings: "セッション設定",
@@ -308,6 +311,19 @@ const ja: Dict = {
     connecting: "接続中",
     connected: "接続済み",
     error: "エラー",
+  },
+  notify: {
+    title: "返信通知",
+    dot: "未読ドット",
+    dotDesc: "未読の返信があるセッションに赤いドットを表示",
+    system: "システム通知",
+    systemDesc: "バックグラウンドで返信が完了したら通知を表示",
+    note: "バックグラウンド通知にはアプリの実行が必要です。強制終了後は受信できません。有効化時に通知権限を求めます。",
+    unread: "未読の返信あり",
+    unreadCount: "未読 {n} 件",
+    clearAll: "すべて既読にする",
+    aliveTitle: "MobileCode",
+    aliveMsg: "セッションの返信を監視中",
   },
 };
 

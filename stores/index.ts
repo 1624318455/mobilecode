@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { zustandStorage } from "@/lib/mmkv";
 import { clearSecureForServer } from "@/lib/secure";
 import { useWsRules } from "@/stores/diagnostics";
+import { useUnreadStore } from "@/stores/unread";
 
 const STORE_NAME = "mobilecode-store";
 const STORE_VERSION = 2;
@@ -128,6 +129,10 @@ interface AppState {
   localePref: LocalePref;
   setLocalePref: (pref: LocalePref) => void;
 
+  // Auto read-aloud for chat replies (persisted)
+  autoRead: boolean;
+  setAutoRead: (value: boolean) => void;
+
   // Last seen LAN IP for instant reconnect (persisted)
   lastSeenIp: string | null;
   setLastSeenIp: (ip: string | null) => void;
@@ -151,12 +156,14 @@ export const useAppStore = create<AppState>()(
             s.id === id ? { ...s, ...updates } : s,
           ),
         })),
-      removeServer: (id) =>
+      removeServer: (id) => {
+        useUnreadStore.getState().clearForServer(id);
         set((state) => ({
           servers: state.servers.filter((s) => s.id !== id),
           lastServerId:
             state.lastServerId === id ? null : state.lastServerId,
-        })),
+        }));
+      },
 
       // Startup
       startupBehavior: "list",
@@ -175,6 +182,13 @@ export const useAppStore = create<AppState>()(
       setLocalePref: (pref) =>
         set({
           localePref: pref,
+        }),
+
+      // Auto read-aloud
+      autoRead: false,
+      setAutoRead: (value) =>
+        set({
+          autoRead: value,
         }),
 
       // Last seen LAN IP
@@ -197,6 +211,7 @@ export const useAppStore = create<AppState>()(
         });
         zustandStorage.removeItem(STORE_NAME);
         useWsRules.getState().clearRules();
+        useUnreadStore.getState().clearAll();
 
         for (const ref of refs) {
           clearSecureForServer(ref);
@@ -213,6 +228,7 @@ export const useAppStore = create<AppState>()(
         lastServerId: state.lastServerId,
         localePref: state.localePref,
         lastSeenIp: state.lastSeenIp,
+        autoRead: state.autoRead,
       }),
       migrate: (persisted, version) => {
         try {
@@ -221,6 +237,7 @@ export const useAppStore = create<AppState>()(
             lastServerId?: string | null;
             localePref?: LocalePref;
             lastSeenIp?: string | null;
+            autoRead?: boolean;
           };
           const startupBehavior = state.startupBehavior;
 
@@ -237,6 +254,7 @@ export const useAppStore = create<AppState>()(
             localePref: sanitizeLocalePref(state.localePref),
             lastSeenIp:
               typeof state.lastSeenIp === "string" ? state.lastSeenIp : null,
+            autoRead: state.autoRead === true,
           };
         } catch {
           return {
@@ -245,6 +263,7 @@ export const useAppStore = create<AppState>()(
             lastServerId: null,
             localePref: "system" as LocalePref,
             lastSeenIp: null,
+            autoRead: false,
           };
         }
       },

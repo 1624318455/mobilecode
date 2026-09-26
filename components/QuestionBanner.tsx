@@ -13,15 +13,17 @@ import type { QuestionRequest } from "@opencode-ai/sdk/v2";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { createClient } from "@/lib/opencode-client";
+import { isAskStale } from "@/lib/staleAsk";
 import { useT } from "@/lib/i18n";
 import { Server } from "@/stores";
 
 interface QuestionBannerProps {
   request: QuestionRequest;
   server: Server;
+  directory?: string;
 }
 
-export function QuestionBanner({ request, server }: QuestionBannerProps) {
+export function QuestionBanner({ request, server, directory }: QuestionBannerProps) {
   const theme = useAppTheme();
   const { t } = useT();
   const queryClient = useQueryClient();
@@ -38,6 +40,7 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
     mutationFn: async (answers: string[][]) => {
       const client = createClient({
         baseUrl: server.url,
+        directory,
         username: server.username,
         password: server.password,
       });
@@ -61,6 +64,7 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
     mutationFn: async () => {
       const client = createClient({
         baseUrl: server.url,
+        directory,
         username: server.username,
         password: server.password,
       });
@@ -80,6 +84,12 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
   });
 
   const isPending = replyMutation.isPending || rejectMutation.isPending;
+  const stale = isAskStale(
+    queryClient,
+    server.url,
+    request.sessionID,
+    request.tool?.messageID,
+  );
 
   function toggleOption(questionIndex: number, label: string) {
     setSelections((prev) => {
@@ -134,7 +144,7 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
       exiting={FadeOut.duration(200)}
       className="mx-4 mb-3 overflow-hidden"
       style={{
-        backgroundColor: "#FFFFFF",
+        backgroundColor: theme.colors.surface,
         borderRadius: 28,
         borderWidth: 1,
         borderColor: theme.colors.outlineVariant,
@@ -148,7 +158,7 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
             className="text-sm font-semibold"
             style={{ color: theme.colors.onSecondaryContainer }}
           >
-            {t("question.title")}
+            {stale ? t("permission.expired") : t("question.title")}
           </Text>
         </View>
         <Pressable
@@ -164,7 +174,8 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
       </View>
 
       {/* Questions */}
-      {request.questions.map((question, qi) => (
+      {!stale ? (
+      request.questions.map((question, qi) => (
         <View key={qi} className="px-4 pb-3">
           <Text
             className="text-sm font-medium mb-2"
@@ -242,23 +253,40 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
             />
           ) : null}
         </View>
-      ))}
+      ))
+      ) : null}
 
       {/* Actions */}
       <View className="flex-row justify-end gap-2 px-4 pb-3">
-        <Pressable
-          onPress={() => rejectMutation.mutate()}
-          disabled={isPending}
-          className="px-4 py-2 rounded-[28px]"
-          style={{ backgroundColor: theme.colors.surfaceVariant }}
-        >
-          <Text
-            className="text-sm font-medium"
-            style={{ color: theme.colors.onSurfaceVariant }}
+        {stale ? (
+          <Pressable
+            onPress={() => rejectMutation.mutate()}
+            disabled={isPending}
+            className="px-4 py-2 rounded-[28px]"
+            style={{ backgroundColor: theme.colors.surfaceVariant }}
           >
-            {t("question.dismiss")}
-          </Text>
-        </Pressable>
+            <Text
+              className="text-sm font-medium"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              {t("question.dismiss")}
+            </Text>
+          </Pressable>
+        ) : (
+          <>
+            <Pressable
+              onPress={() => rejectMutation.mutate()}
+              disabled={isPending}
+              className="px-4 py-2 rounded-[28px]"
+              style={{ backgroundColor: theme.colors.surfaceVariant }}
+            >
+              <Text
+                className="text-sm font-medium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {t("question.dismiss")}
+              </Text>
+            </Pressable>
         <Pressable
           onPress={handleSubmit}
           disabled={isPending || !canSubmit}
@@ -285,6 +313,8 @@ export function QuestionBanner({ request, server }: QuestionBannerProps) {
             {t("question.submit")}
           </Text>
         </Pressable>
+          </>
+        )}
       </View>
       {(replyMutation.error || rejectMutation.error) && (
         <Text

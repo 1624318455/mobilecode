@@ -1,0 +1,15 @@
+{
+  "name": "mobilecode-alive",
+  "version": "1.0.0",
+  "description": "Minimal Expo foreground service (dataSync) that keeps MobileCode listening for session replies in background. Android only.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {},
+  "keywords": [
+    "expo",
+    "foreground-service",
+    "android"
+  ],
+  "license": "MIT",
+  "private": true
+}

@@ -29,6 +29,7 @@ const config: ExpoConfig = {
       backgroundColor: "#000000",
     },
     package: bundleIdentifier,
+    permissions: ["POST_NOTIFICATIONS"],
   },
   web: {
     bundler: "metro",
@@ -38,6 +39,8 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "expo-font",
+    "expo-notifications",
+    "./plugins/withAliveService.js",
     [
       "expo-splash-screen",
       {
