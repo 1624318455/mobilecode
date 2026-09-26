@@ -5,6 +5,7 @@ import { createClient } from "@/lib/opencode-client";
 import { useT } from "@/lib/i18n";
 import { DiagnosticReport, PROTOCOL_VERSION, WsRule } from "@/lib/protocol";
 import { Server } from "@/stores";
+import { useDiagLogStore } from "@/stores/diagLog";
 
 export type GatewayState = "ok" | "down" | "expired" | "unknown";
 
@@ -73,6 +74,13 @@ export function useDiagnostics(servers: Server[]) {
 
     setChecks((prev) => ({ ...prev, [server.id]: result }));
     setChecking((prev) => ({ ...prev, [server.id]: false }));
+    useDiagLogStore.getState().log(
+      server.name,
+      result.state === "ok" ? "success" : "error",
+      result.latencyMs !== null
+        ? `${result.detail} · ${result.latencyMs}ms`
+        : result.detail,
+    );
 
     return result;
   }, [t]);

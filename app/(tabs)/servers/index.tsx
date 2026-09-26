@@ -43,7 +43,7 @@ const DeviceRowHost = memo(function DeviceRowHost({
   }, [setLastServerId, server.id]);
 
   return (
-    <SignatureEntrance index={index} animate={animate}>
+    <SignatureEntrance index={index} animate={animate} speed={1.5}>
       <DeviceRow
         record={record}
         checking={checking}

@@ -1,15 +1,14 @@
 import { router } from "expo-router";
 import { MoreVertical, RefreshCw } from "lucide-react-native";
-import { memo } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { memo, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
+import { DeviceMenuSheet } from "@/components/DeviceMenuSheet";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { formatTimeAgo } from "@/lib/formatTimeAgo";
 import { useT } from "@/lib/i18n";
 import { useNotifyColors } from "@/lib/notify";
 import { DeviceRecord, Reachability } from "@/lib/protocol";
-import { clearSecureForServer } from "@/lib/secure";
-import { useAppStore } from "@/stores";
 
 const STATUS_LABELS = (t: (key: string) => string): Record<DeviceRecord["reachable"], string> => ({
   ok: t("device.reachable"),
@@ -35,8 +34,7 @@ export const DeviceRow = memo(function DeviceRow({
   const theme = useAppTheme();
   const { t } = useT();
   const notify = useNotifyColors();
-  const removeServer = useAppStore((s) => s.removeServer);
-  const server = useAppStore((s) => s.servers.find((x) => x.id === record.id));
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const dotColor: Record<Reachability, string> = {
     ok: theme.colors.tertiary,
@@ -44,50 +42,6 @@ export const DeviceRow = memo(function DeviceRow({
     unreachable: theme.colors.onSurfaceVariant,
     revoked: theme.colors.onSurfaceVariant,
     expired: notify.accent,
-  };
-
-  const handleMenu = () => {
-    const labels = STATUS_LABELS(t);
-
-    Alert.alert(record.customName, `${record.origin}`, [
-      {
-        text: t("device.menuRepair"),
-        onPress: () => {
-          router.push("/server/pair");
-        },
-      },
-      {
-        text: t("device.menuCheck"),
-        onPress: () => {
-          onCheck();
-        },
-      },
-      {
-        text: t("device.menuDelete"),
-        style: "destructive",
-        onPress: () => {
-          Alert.alert(
-            t("device.delTitle"),
-            t("device.delMsg"),
-            [
-              { text: t("common.cancel"), style: "cancel" },
-              {
-                text: t("common.delete"),
-                style: "destructive",
-                onPress: () => {
-                  if (server?.deviceTokenRef) {
-                    clearSecureForServer(server.deviceTokenRef);
-                  }
-
-                  removeServer(record.id);
-                },
-              },
-            ],
-          );
-        },
-      },
-      { text: t("common.cancel"), style: "cancel" },
-    ]);
   };
 
   return (
@@ -141,7 +95,9 @@ export const DeviceRow = memo(function DeviceRow({
           )}
         </Pressable>
         <Pressable
-          onPress={handleMenu}
+          onPress={() => {
+            setMenuVisible(true);
+          }}
           className="p-2"
           accessibilityLabel={t("a11y.deviceMenu")}
           accessibilityRole="button"
@@ -149,6 +105,16 @@ export const DeviceRow = memo(function DeviceRow({
         >
           <MoreVertical size={18} color={theme.colors.onSurfaceVariant} />
         </Pressable>
+        {menuVisible ? (
+          <DeviceMenuSheet
+            visible
+            record={record}
+            onCheck={onCheck}
+            onClose={() => {
+              setMenuVisible(false);
+            }}
+          />
+        ) : null}
       </View>
       {(record.reachable === "expired" || record.reachable === "revoked") && (
         <Pressable

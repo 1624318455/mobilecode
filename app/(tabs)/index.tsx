@@ -1,10 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  FlatList,
   Pressable,
   RefreshControl,
+  SectionList,
   Text,
   View,
 } from "react-native";
@@ -32,6 +33,7 @@ export default function RecentsScreen() {
   const redirected = useRef(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [scrolled, setScrolled] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   // An empty snapshot with no error is suspicious (server index may not have
   // been ready on first hit): revalidate once automatically so the user never
   // has to pull-to-refresh to fix it. Reset per server set.
@@ -122,28 +124,105 @@ export default function RecentsScreen() {
     Math.max(visibleCount, PAGE_SIZE),
   );
 
+  // Group the visible page by device, keeping first-seen order (= most
+  // recently active device first, since visibleSessions is time-sorted).
+  const sections = useMemo(() => {
+    const order: string[] = [];
+    const groups = new Map<string, RecentSession[]>();
+    for (const s of visibleSessions) {
+      const group = groups.get(s.serverId);
+      if (group) {
+        group.push(s);
+      } else {
+        groups.set(s.serverId, [s]);
+        order.push(s.serverId);
+      }
+    }
+
+    const totals = new Map<string, number>();
+    for (const s of recentSessions) {
+      totals.set(s.serverId, (totals.get(s.serverId) ?? 0) + 1);
+    }
+
+    return order.map((serverId) => {
+      const items = groups.get(serverId) ?? [];
+      return {
+        serverId,
+        serverName: items[0]?.serverName ?? serverId,
+        total: totals.get(serverId) ?? items.length,
+        data: collapsed.has(serverId) ? [] : items,
+      };
+    });
+  }, [visibleSessions, recentSessions, collapsed]);
+
+  const toggleSection = useCallback((serverId: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(serverId)) {
+        next.delete(serverId);
+      } else {
+        next.add(serverId);
+      }
+      return next;
+    });
+  }, []);
+
   const renderItem = useCallback(
     ({ item, index }: { item: RecentSession; index: number }) => (
-      <RecentRow item={item} index={index} animate={!scrolled} />
+      <RecentRow item={item} index={index} animate={!scrolled} showServer={false} />
     ),
     [scrolled],
   );
 
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: { serverId: string; serverName: string; total: number } }) => {
+      const isCollapsed = collapsed.has(section.serverId);
+      const Icon = isCollapsed ? ChevronRight : ChevronDown;
+      return (
+        <Pressable
+          onPress={() => toggleSection(section.serverId)}
+          className="flex-row items-center py-2"
+          style={{ backgroundColor: theme.colors.surface }}
+          accessibilityRole="button"
+          accessibilityLabel={section.serverName}
+        >
+          <Icon size={18} color={theme.colors.onSurfaceVariant} />
+          <Text
+            className="text-base font-semibold ml-1 flex-1"
+            style={{ color: theme.colors.onSurface }}
+            numberOfLines={1}
+          >
+            {section.serverName}
+          </Text>
+          <Text
+            className="text-xs ml-2"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            {t("serverContent.sessionCount", { n: section.total })}
+          </Text>
+        </Pressable>
+      );
+    },
+    [collapsed, theme, t, toggleSection],
+  );
+
   return (
-    <FlatList
+    <SectionList
       className="flex-1"
       style={{ backgroundColor: theme.colors.surface }}
       contentContainerStyle={{ padding: 16, flexGrow: 1 }}
-      data={visibleSessions}
+      sections={sections}
       keyExtractor={(item) =>
         `${item.serverId}-${item.projectId}-${item.sessionId}`
       }
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.5}
       onScrollBeginDrag={() => setScrolled(true)}
+      stickySectionHeadersEnabled
       refreshControl={
         <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
       }
+      renderSectionHeader={renderSectionHeader}
       renderItem={renderItem}
       ListEmptyComponent={
         isLoading ? (

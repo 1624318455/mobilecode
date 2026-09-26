@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,11 +10,13 @@ import {
 } from "react-native";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { DiagLogSection } from "@/components/DiagLogSection";
 import { SkeletonRows } from "@/components/SkeletonRows";
 import { GatewayState, useDiagnostics } from "@/hooks/useDiagnostics";
 import { useAllSessions } from "@/hooks/useAllSessions";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/stores";
+import { useDiagLogStore } from "@/stores/diagLog";
 import { useWsRules } from "@/stores/diagnostics";
 
 export default function DiagnosticsScreen() {
@@ -44,6 +46,29 @@ export default function DiagnosticsScreen() {
   useEffect(() => {
     checkAll();
   }, [checkAll]);
+
+  const loggedFetchErrors = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    checkAll();
+  }, [checkAll]);
+
+  // Mirror aggregation failures into the resident log (once per distinct
+  // error per server; cleared when the error goes away).
+  useEffect(() => {
+    for (const info of fetchInfo) {
+      if (info.error) {
+        if (loggedFetchErrors.current[info.serverId] !== info.error) {
+          loggedFetchErrors.current[info.serverId] = info.error;
+          useDiagLogStore
+            .getState()
+            .log(info.serverName || info.serverId, "error", info.error);
+        }
+      } else {
+        delete loggedFetchErrors.current[info.serverId];
+      }
+    }
+  }, [fetchInfo]);
 
   const handleCopyReport = async () => {
     const report = buildReport();
@@ -279,6 +304,8 @@ export default function DiagnosticsScreen() {
             </View>
           ))}
         </View>
+
+        <DiagLogSection />
 
         <Pressable
           onPress={handleCopyReport}

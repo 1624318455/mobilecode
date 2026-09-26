@@ -14,9 +14,10 @@ interface RecentRowProps {
   item: RecentSession;
   index: number;
   animate?: boolean;
+  showServer?: boolean;
 }
 
-export const RecentRow = memo(function RecentRow({ item, index, animate = true }: RecentRowProps) {
+export const RecentRow = memo(function RecentRow({ item, index, animate = true, showServer = true }: RecentRowProps) {
   const theme = useAppTheme();
   const { t } = useT();
 
@@ -27,7 +28,7 @@ export const RecentRow = memo(function RecentRow({ item, index, animate = true }
   }, [item.serverId, item.projectId, item.sessionId]);
 
   return (
-    <SignatureEntrance index={index} animate={animate}>
+    <SignatureEntrance index={index} animate={animate} speed={1.5}>
       <SignatureCard onPress={handlePress} style={{ padding: 16, marginBottom: 12 }}>
         <View className="flex-row items-center">
             <View
@@ -58,7 +59,7 @@ export const RecentRow = memo(function RecentRow({ item, index, animate = true }
               className="text-sm mt-0.5"
               style={{ color: theme.colors.onSurfaceVariant }}
             >
-              {item.projectName} • {item.serverName}
+              {showServer ? `${item.projectName} • ${item.serverName}` : item.projectName}
             </Text>
             <Text
               className="text-xs mt-0.5"
