@@ -16,6 +16,10 @@ export interface ReplyHealth {
   lastBgAt: number | null;
   lastFgAt: number | null;
   pollCount: number;
+  lastSpeakAt: number | null;
+  lastSpeakSid: string | null;
+  lastSpeakMsg: string | null;
+  lastSpeakWhy: string | null;
 }
 
 interface ReplyHealthStore {
@@ -37,6 +41,10 @@ const EMPTY: ReplyHealth = {
   lastBgAt: null,
   lastFgAt: null,
   pollCount: 0,
+  lastSpeakAt: null,
+  lastSpeakSid: null,
+  lastSpeakMsg: null,
+  lastSpeakWhy: null,
 };
 
 // Ephemeral (not persisted): proves whether the global reply watcher on
