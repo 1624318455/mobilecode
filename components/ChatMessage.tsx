@@ -1,9 +1,10 @@
 import { memo } from "react";
 import { Text, View } from "react-native";
-import type { Message, Part } from "@opencode-ai/sdk/v2";
+import type { Message, Part, PermissionRequest, QuestionRequest } from "@opencode-ai/sdk/v2";
 
-import { ChatMessagePart } from "./ChatMessagePart";
+import { ChatMessagePart, PartLongPress } from "./ChatMessagePart";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { Server } from "@/stores";
 import { TypingDots } from "./TypingDots";
 
 interface ChatMessageProps {
@@ -11,13 +12,36 @@ interface ChatMessageProps {
     info: Message;
     parts: Part[];
   };
+  server?: Server;
+  pendingQuestions?: QuestionRequest[];
+  pendingPermissions?: PermissionRequest[];
+  selectablePartId?: string | null;
+  onLongPressText?: (info: PartLongPress) => void;
+  isStreaming?: boolean;
+  sessionActive?: boolean;
 }
 
-export const ChatMessage = memo(function ChatMessage({ message }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({
+  message,
+  server,
+  pendingQuestions,
+  pendingPermissions,
+  selectablePartId,
+  onLongPressText,
+  isStreaming = false,
+  sessionActive = true,
+}: ChatMessageProps) {
   const theme = useAppTheme();
   const isUser = message.info.role === "user";
   const isAssistantTyping =
     message.info.role === "assistant" && !message.info.finish;
+  // A run that dies without a finish flag would otherwise spin the dots
+  // forever: only show them while the session is actually running, or the
+  // message is brand new (covers status poll lag).
+  const showTyping =
+    isAssistantTyping &&
+    (sessionActive ||
+      Date.now() - message.info.time.created < 60000);
 
   if (
     message.info.role === "assistant" &&
@@ -50,30 +74,26 @@ export const ChatMessage = memo(function ChatMessage({ message }: ChatMessagePro
             )}
           </View>
         </View>
-        <Text
-          className="text-xs mt-1 px-2"
-          style={{ color: theme.colors.onSurfaceVariant }}
-        >
-          {new Date(message.info.time.created).toLocaleTimeString()}
-        </Text>
       </View>
-    );
-  }
+      );
+    }
 
   return (
     <View className={`mb-4 ${isUser ? "items-end" : "items-start"}`}>
       {message.parts.map((part, index) => (
-        <ChatMessagePart key={index} part={part} isUser={isUser} />
+        <ChatMessagePart
+          key={part.id ?? index}
+          part={part}
+          isUser={isUser}
+          server={server}
+          pendingQuestions={pendingQuestions}
+          pendingPermissions={pendingPermissions}
+          selectable={selectablePartId === part.id}
+          onLongPressText={onLongPressText}
+          isStreaming={isStreaming}
+        />
       ))}
-      {message.parts.length > 0 && (
-        <Text
-          className="text-xs mt-1 px-2"
-          style={{ color: theme.colors.onSurfaceVariant }}
-        >
-          {new Date(message.info.time.created).toLocaleTimeString()}
-        </Text>
-      )}
-      {isAssistantTyping && <TypingDots />}
+      {showTyping && <TypingDots />}
     </View>
   );
 });

@@ -1,27 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/opencode-client";
-import { directoriesQueryKey, discoverDirectoryProjects } from "@/hooks/useAllSessions";
+import { aggregateQueryKey } from "@/hooks/useAggregatedSessions";
+import { discoverDirectoryProjects } from "@/hooks/useAllSessions";
+import { fetchAggregatedSessions } from "@/lib/sessionAggregate";
 import { Server } from "@/stores";
 
-// Shares the ["server", url, "directories"] cache entry with useAllSessions
-// phase 1 on purpose: same key, same DirectoryProject[] shape, one fetch.
+// Shares the ["server", url, "aggregate"] cache entry with useAllSessions
+// on purpose: same key, one fan-out fetch per server, local selects differ.
 export function useServerDirectories(server: Server) {
   return useQuery({
-    queryKey: directoriesQueryKey(server.url),
+    queryKey: aggregateQueryKey(server.url),
     queryFn: async () => {
-      const client = createClient({
-        baseUrl: server.url,
-        username: server.username,
-        password: server.password,
-      });
-      const result = await client.session.list();
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      return discoverDirectoryProjects(result.data || []);
+      return fetchAggregatedSessions(server);
     },
+    retry: 2,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    select: (result) => discoverDirectoryProjects(result.sessions),
   });
 }

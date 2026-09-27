@@ -1,9 +1,21 @@
+import * as Clipboard from "expo-clipboard";
 import MarkdownIt from "markdown-it";
-import React, { useMemo } from "react";
-import { Image, Linking, Platform, Text } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  Text,
+  View,
+  ViewStyle,
+} from "react-native";
 import Markdown from "react-native-markdown-display";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { useT } from "@/lib/i18n";
 
 const baseFontSize = 15;
 const baseLineHeight = 22;
@@ -95,8 +107,8 @@ function buildMarkdownStyles(p: MdPalette) {
       flexDirection: "row" as const,
     },
     paragraph: {
-      marginTop: 4,
-      marginBottom: 4,
+      marginTop: 2,
+      marginBottom: 2,
     },
     strong: {
       fontWeight: "bold" as const,
@@ -159,6 +171,7 @@ function buildMarkdownStyles(p: MdPalette) {
     tbody: {},
     th: {
       flex: 1,
+      minWidth: 96,
       padding: 6,
       fontWeight: "bold" as const,
     },
@@ -169,6 +182,7 @@ function buildMarkdownStyles(p: MdPalette) {
     },
     td: {
       flex: 1,
+      minWidth: 96,
       padding: 6,
     },
     hr: {
@@ -227,12 +241,107 @@ function handleLinkPress(url: string) {
   return false;
 }
 
+interface FenceNode {
+  key: string;
+  content: string;
+  sourceInfo?: string;
+}
+
+function fenceLanguage(node: FenceNode): string {
+  return (node.sourceInfo ?? "").trim().split(/\s+/)[0] ?? "";
+}
+
+function CodeBlock({
+  content,
+  language,
+  selectable,
+  viewStyle,
+  textColor,
+}: {
+  content: string;
+  language: string;
+  selectable: boolean;
+  viewStyle: StyleProp<ViewStyle>;
+  textColor: string;
+}) {
+  const theme = useAppTheme();
+  const { t } = useT();
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  function handleCopy() {
+    void Clipboard.setStringAsync(content);
+    setCopied(true);
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    timerRef.current = setTimeout(() => {
+      setCopied(false);
+    }, 1500);
+  }
+
+  return (
+    <View style={viewStyle}>
+      <View className="flex-row items-center mb-1">
+        <Text
+          className="flex-1 text-xs font-mono"
+          style={{ color: theme.colors.onSurfaceVariant }}
+          numberOfLines={1}
+        >
+          {language}
+        </Text>
+        <Pressable
+          onPress={handleCopy}
+          className="px-2 py-1"
+          accessibilityLabel={t("menu.copy")}
+          accessibilityRole="button"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text
+            className="text-xs"
+            style={{ color: copied ? theme.colors.tertiary : theme.colors.primary }}
+          >
+            {copied ? t("menu.copied") : t("menu.copy")}
+          </Text>
+        </Pressable>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <Text
+          style={{
+            fontFamily: monoFont,
+            fontSize: 13,
+            color: textColor,
+          }}
+          selectable={selectable}
+        >
+          {content}
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
 interface MarkdownContentProps {
   content: string;
   isUser: boolean;
+  selectable?: boolean;
 }
 
-export function MarkdownContent({ content, isUser }: MarkdownContentProps) {
+export function MarkdownContent({
+  content,
+  isUser,
+  selectable = false,
+}: MarkdownContentProps) {
   const theme = useAppTheme();
 
   // markdown-it has no task-list plugin: rewrite `- [ ]` / `- [x]` into
@@ -246,8 +355,11 @@ export function MarkdownContent({ content, isUser }: MarkdownContentProps) {
   );
 
   const styles = useMemo(() => {
+    // User bubbles are tinted (secondaryContainer): tint the markdown
+    // palette off the container color so text stays legible on blue.
+    // Assistant renders on plain surface: plain onSurface palette.
     if (isUser) {
-      const onContainer = theme.colors.onPrimaryContainer;
+      const onContainer = theme.colors.onSecondaryContainer;
 
       return buildMarkdownStyles({
         text: onContainer,
@@ -275,6 +387,30 @@ export function MarkdownContent({ content, isUser }: MarkdownContentProps) {
     });
   }, [isUser, theme]);
 
+  // Body is a View (not Text): block children (table/blockquote/code)
+  // must never nest a View inside a Text, which mis-measures borders and
+  // draws them over the text. Leaf Text nodes carry the font + selectable.
+  const leafTextStyle = useMemo(
+    () => ({
+      color: styles.body.color,
+      fontSize: baseFontSize,
+      lineHeight: baseLineHeight,
+    }),
+    [styles],
+  );
+
+  // View-safe subset of the code style (no font/color text props).
+  const codeViewStyle = useMemo(
+    () => ({
+      backgroundColor: styles.code_block.backgroundColor,
+      borderWidth: styles.code_block.borderWidth,
+      borderColor: styles.code_block.borderColor,
+      borderRadius: 8,
+      padding: 10,
+    }),
+    [styles],
+  );
+
   return (
     <Markdown
       markdownit={markdownItInstance}
@@ -282,69 +418,89 @@ export function MarkdownContent({ content, isUser }: MarkdownContentProps) {
       style={styles}
       rules={{
         body: (node, children) => (
-          <Text key={node.key} style={styles.body} selectable={true}>
-            {children}
-          </Text>
+          <View key={node.key}>{children}</View>
         ),
         textgroup: (node, children) => (
           <React.Fragment key={node.key}>{children}</React.Fragment>
         ),
         paragraph: (node, children) => (
-          <Text key={node.key} style={styles.paragraph}>
+          <Text
+            key={node.key}
+            style={[leafTextStyle, styles.paragraph]}
+            selectable={selectable}
+          >
             {children}
-            {"\n"}
           </Text>
         ),
         heading1: (node, children) => (
-          <Text key={node.key} style={styles.heading1}>
+          <Text key={node.key} style={styles.heading1} selectable={selectable}>
             {children}
             {"\n"}
           </Text>
         ),
         heading2: (node, children) => (
-          <Text key={node.key} style={styles.heading2}>
+          <Text key={node.key} style={styles.heading2} selectable={selectable}>
             {children}
             {"\n"}
           </Text>
         ),
         heading3: (node, children) => (
-          <Text key={node.key} style={styles.heading3}>
+          <Text key={node.key} style={styles.heading3} selectable={selectable}>
             {children}
             {"\n"}
           </Text>
         ),
         heading4: (node, children) => (
-          <Text key={node.key} style={styles.heading4}>
+          <Text key={node.key} style={styles.heading4} selectable={selectable}>
             {children}
             {"\n"}
           </Text>
         ),
         heading5: (node, children) => (
-          <Text key={node.key} style={styles.heading5}>
+          <Text key={node.key} style={styles.heading5} selectable={selectable}>
             {children}
             {"\n"}
           </Text>
         ),
         heading6: (node, children) => (
-          <Text key={node.key} style={styles.heading6}>
+          <Text key={node.key} style={styles.heading6} selectable={selectable}>
             {children}
             {"\n"}
           </Text>
         ),
         blockquote: (node, children) => (
-          <Text key={node.key} style={styles.blockquote}>
+          <View key={node.key} style={styles.blockquote}>
             {children}
-          </Text>
+          </View>
         ),
         code_block: (node) => (
-          <Text key={node.key} style={styles.code_block}>
-            {node.content}
-          </Text>
+          <CodeBlock
+            key={node.key}
+            content={node.content}
+            language=""
+            selectable={selectable}
+            viewStyle={codeViewStyle}
+            textColor={styles.body.color}
+          />
         ),
         fence: (node) => (
-          <Text key={node.key} style={styles.fence}>
-            {node.content}
-          </Text>
+          <CodeBlock
+            key={node.key}
+            content={node.content}
+            language={fenceLanguage(node as FenceNode)}
+            selectable={selectable}
+            viewStyle={codeViewStyle}
+            textColor={styles.body.color}
+          />
+        ),
+        table: (node, children) => (
+          <ScrollView
+            key={node.key}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            <View style={styles.table}>{children}</View>
+          </ScrollView>
         ),
         bullet_list: (node, children) => (
           <React.Fragment key={node.key}>{children}</React.Fragment>
@@ -357,7 +513,11 @@ export function MarkdownContent({ content, isUser }: MarkdownContentProps) {
           const bullet = isOrdered ? `${node.index + 1}. ` : "• ";
 
           return (
-            <Text key={node.key} style={styles.list_item}>
+            <Text
+              key={node.key}
+              style={[leafTextStyle, styles.list_item]}
+              selectable={selectable}
+            >
               {bullet}
               {children}
               {"\n"}

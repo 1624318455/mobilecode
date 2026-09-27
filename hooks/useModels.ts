@@ -7,6 +7,17 @@ export interface ModelInfo {
   id: string;
   providerID: string;
   name: string;
+  limitContext?: number;
+}
+
+export interface ContextUsage {
+  used: number;
+  input: number;
+  output: number;
+  cached: number;
+  limit: number | null;
+  percent: number | null;
+  modelName: string;
 }
 
 export async function fetchProviders(server: Server) {
@@ -39,6 +50,10 @@ export function useModels(server: Server) {
               id: m.id,
               providerID: p.id,
               name: m.name,
+              limitContext:
+                typeof m.limit?.context === "number"
+                  ? m.limit.context
+                  : undefined,
             })),
         );
     },

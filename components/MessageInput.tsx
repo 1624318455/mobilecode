@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { Avatar, Chip, IconButton } from "react-native-paper";
 
+import { AttachSheet } from "@/components/AttachSheet";
+import { ContextSheet } from "@/components/ContextSheet";
 import {
   FileMentionItem,
   FileMentionPopover,
@@ -17,7 +19,8 @@ import {
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { SIGNATURE_RADIUS } from "@/components/SignatureCard";
 import { useFileSearch } from "@/hooks/useFileSearch";
-import { ModelInfo } from "@/hooks/useModels";
+import { ContextUsage, ModelInfo } from "@/hooks/useModels";
+import { agentRole } from "@/lib/agentColors";
 import { useT } from "@/lib/i18n";
 import { Server } from "@/stores";
 
@@ -32,6 +35,7 @@ interface MessageInputProps {
   selectedModel: ModelInfo | undefined;
   server: Server;
   projectPath: string | undefined;
+  usage?: ContextUsage | null;
 }
 
 /** Unicode zero-width space used as invisible delimiters around mentions. */
@@ -153,12 +157,15 @@ export function MessageInput({
   selectedModel,
   server,
   projectPath,
+  usage,
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [mentionedPaths, setMentionedPaths] = useState<Set<string>>(
     new Set(),
   );
   const [showPopover, setShowPopover] = useState(false);
+  const [showAttachSheet, setShowAttachSheet] = useState(false);
+  const [showContextSheet, setShowContextSheet] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const cursorPosRef = useRef(0);
@@ -265,6 +272,34 @@ export function MessageInput({
     [message],
   );
 
+  // Insert a file token at the cursor without requiring a typed "@".
+  // Used by the attach (+) button; shares the mention token format so the
+  // existing send chain (mentionedPaths -> files) picks it up unchanged.
+  const handleAttachSelect = useCallback(
+    (item: FileMentionItem) => {
+      const at = Math.max(0, Math.min(cursorPosRef.current, message.length));
+      const token = mentionToken(item.path) + " ";
+      const newMessage = message.slice(0, at) + token + message.slice(at);
+
+      setMessage(newMessage);
+      cursorPosRef.current = at + token.length;
+
+      setMentionedPaths((prev) => {
+        const next = new Set(prev);
+        next.add(item.path);
+
+        return next;
+      });
+
+      setShowAttachSheet(false);
+
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    },
+    [message],
+  );
+
   const handleSend = () => {
     const trimmed = message.trim();
     if (!trimmed || disabled) {
@@ -322,8 +357,10 @@ export function MessageInput({
 
       <View
         style={{
-          backgroundColor: theme.colors.surfaceContainerHigh,
+          backgroundColor: theme.colors.surface,
           borderRadius: SIGNATURE_RADIUS,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
         }}
       >
         <View className="flex-row items-end px-4 py-2">
@@ -370,12 +407,27 @@ export function MessageInput({
         </View>
 
         <View className="flex-row items-center px-3 pb-2 pt-0.5 gap-1">
+          <IconButton
+            icon="plus-circle-outline"
+            size={20}
+            onPress={() => setShowAttachSheet(true)}
+            disabled={disabled}
+            accessibilityLabel={t("a11y.attachFile")}
+            accessibilityRole="button"
+            style={{ margin: 0 }}
+          />
           <Chip
             compact
             mode="flat"
             onPress={() => router.push("/picker/agent")}
-            textStyle={{ textTransform: "capitalize" }}
-            style={{ marginRight: 4 }}
+            textStyle={{
+              textTransform: "capitalize",
+              color: theme.colors[agentRole(selectedAgent).content],
+            }}
+            style={{
+              marginRight: 4,
+              backgroundColor: theme.colors[agentRole(selectedAgent).container],
+            }}
           >
             {selectedAgent}
           </Chip>
@@ -396,8 +448,32 @@ export function MessageInput({
           >
             {selectedModel?.name || t("input.selectModel")}
           </Chip>
+
+          {usage ? (
+            <IconButton
+              icon="gauge"
+              size={20}
+              onPress={() => setShowContextSheet(true)}
+              disabled={disabled}
+              accessibilityLabel={t("input.contextUsage")}
+              accessibilityRole="button"
+              style={{ margin: 0 }}
+            />
+          ) : null}
         </View>
       </View>
+      <AttachSheet
+        visible={showAttachSheet}
+        onClose={() => setShowAttachSheet(false)}
+        onSelect={handleAttachSelect}
+        server={server}
+        projectPath={projectPath}
+      />
+      <ContextSheet
+        visible={showContextSheet}
+        onClose={() => setShowContextSheet(false)}
+        usage={usage}
+      />
     </View>
   );
 }

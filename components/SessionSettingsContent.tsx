@@ -9,6 +9,7 @@ import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useProjects } from "@/hooks/useProjects";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { createClient } from "@/lib/opencode-client";
+import { resolveProjectPath } from "@/lib/sessionAggregate";
 import { useT } from "@/lib/i18n";
 import { Server } from "@/stores";
 
@@ -29,8 +30,6 @@ export function SessionSettingsContent({
   const { data: messages = [] } = useSessionMessages(server, sessionId);
   const { data: projects = [] } = useProjects(server);
 
-  const projectPath = projects.find((p) => p.id === projectId)?.worktree;
-
   const { data: session } = useQuery({
     queryKey: ["server", server.url, "sessions", sessionId],
     queryFn: async () => {
@@ -46,6 +45,8 @@ export function SessionSettingsContent({
       return result.data;
     },
   });
+
+  const projectPath = resolveProjectPath(projectId, projects, session?.directory);
 
   const [title, setTitle] = useState("");
   const [justSaved, setJustSaved] = useState(false);

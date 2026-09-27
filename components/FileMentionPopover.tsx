@@ -1,5 +1,12 @@
 import { File, Folder } from "lucide-react-native";
-import { FlatList, Pressable, Text, View } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  StyleProp,
+  Text,
+  View,
+  ViewStyle,
+} from "react-native";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useT } from "@/lib/i18n";
@@ -7,6 +14,9 @@ import { useT } from "@/lib/i18n";
 export interface FileMentionItem {
   path: string;
   isDirectory: boolean;
+  // Absolute server path (forward slashes), present for browse-mode rows
+  // so directories can drill in without path arithmetic.
+  absolute?: string;
 }
 
 interface FileMentionPopoverProps {
@@ -15,6 +25,15 @@ interface FileMentionPopoverProps {
   onSelect: (item: FileMentionItem) => void;
   isLoading: boolean;
   query: string;
+  // Max list height (default 192 = max-h-48). Pass null for no cap when the
+  // parent gives a fixed-flex area (e.g. bottom sheets).
+  maxHeight?: number | null;
+  // Minimum height guarantee: flex chains inside Modals are fragile, this
+  // keeps the list usable even if an ancestor breaks flex propagation.
+  minHeight?: number;
+  style?: StyleProp<ViewStyle>;
+  // Max rows rendered (default 10 = inline @ popover). Sheets pass more.
+  maxItems?: number;
 }
 
 function getFilename(path: string) {
@@ -38,6 +57,10 @@ export function FileMentionPopover({
   onSelect,
   isLoading,
   query,
+  maxHeight = 192,
+  minHeight,
+  style,
+  maxItems = 10,
 }: FileMentionPopoverProps) {
   const theme = useAppTheme();
   const { t } = useT();
@@ -64,16 +87,21 @@ export function FileMentionPopover({
 
   return (
     <View
-      className="rounded-[28px] overflow-hidden max-h-48"
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderWidth: 1,
-        borderColor: theme.colors.outlineVariant,
-        elevation: 3,
-      }}
+      className="rounded-[28px] overflow-hidden"
+      style={[
+        {
+          backgroundColor: theme.colors.surface,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          elevation: 3,
+        },
+        maxHeight != null ? { maxHeight } : null,
+        minHeight != null ? { minHeight } : null,
+        style,
+      ]}
     >
       <FlatList
-        data={items.slice(0, 10)}
+        data={items.slice(0, maxItems)}
         keyExtractor={(item) => item.path}
         keyboardShouldPersistTaps="always"
         renderItem={({ item, index }) => {

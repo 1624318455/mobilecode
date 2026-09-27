@@ -16,6 +16,7 @@ import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useAllSessions } from "@/hooks/useAllSessions";
 import { LocalePref, useAppStore } from "@/stores";
 import { resolveLocaleDebug, useT } from "@/lib/i18n";
+import { normalizeDirectory } from "@/lib/sessionAggregate";
 import { requestNotifyPermission } from "@/lib/systemNotify";
 import { useUnreadStore } from "@/stores/unread";
 
@@ -42,9 +43,15 @@ export default function SettingsScreen() {
   const localeDebug = resolveLocaleDebug(localePref);
   const { recentSessions } = useAllSessions(servers);
   // projectID is unreliable (server often stamps everything "global"),
-  // so count distinct directories instead.
+  // so count distinct directories instead. Normalize spellings of the same
+  // folder ("D:\proj" vs "D:/proj/") and scope by server: the same path on
+  // two machines is two projects.
   const projectCount = new Set(
-    recentSessions.map((s) => s.directory || s.projectId),
+    recentSessions.map((s) =>
+      s.directory
+        ? `${s.serverId}::${normalizeDirectory(s.directory)}`
+        : `${s.serverId}::${s.projectId}`,
+    ),
   ).size;
 
   const version = Application.nativeApplicationVersion || "Unknown";

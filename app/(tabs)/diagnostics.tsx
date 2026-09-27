@@ -14,9 +14,13 @@ import { DiagLogSection } from "@/components/DiagLogSection";
 import { SkeletonRows } from "@/components/SkeletonRows";
 import { GatewayState, useDiagnostics } from "@/hooks/useDiagnostics";
 import { useAllSessions } from "@/hooks/useAllSessions";
+import { BUILD_ID } from "@/lib/buildInfo";
+import { formatTimeAgo } from "@/lib/formatTimeAgo";
 import { useT } from "@/lib/i18n";
 import { useAppStore } from "@/stores";
 import { useDiagLogStore } from "@/stores/diagLog";
+import { useReplyHealthStore } from "@/stores/replyHealth";
+import { useSseStore } from "@/stores/sse";
 import { useWsRules } from "@/stores/diagnostics";
 
 export default function DiagnosticsScreen() {
@@ -30,6 +34,8 @@ export default function DiagnosticsScreen() {
   };
   const servers = useAppStore((s) => s.servers);
   const { fetchInfo } = useAllSessions(servers);
+  const sseByUrl = useSseStore((s) => s.byUrl);
+  const watcherByUrl = useReplyHealthStore((s) => s.byUrl);
   const allowedPaths = useWsRules((s) => s.allowedPaths);
   const allowPath = useWsRules((s) => s.allowPath);
   const removePath = useWsRules((s) => s.removePath);
@@ -42,11 +48,6 @@ export default function DiagnosticsScreen() {
     buildReport,
   } = useDiagnostics(servers);
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    checkAll();
-  }, [checkAll]);
-
   const loggedFetchErrors = useRef<Record<string, string>>({});
 
   useEffect(() => {
@@ -97,7 +98,11 @@ export default function DiagnosticsScreen() {
         {servers.length === 0 && (
           <View
             className="rounded-[28px] p-4 mb-4"
-            style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderWidth: 1,
+              borderColor: theme.colors.outlineVariant,
+            }}
           >
             <Text
               className="text-center"
@@ -131,7 +136,11 @@ export default function DiagnosticsScreen() {
             <View
               key={server.id}
               className="rounded-[28px] p-4 mb-3"
-              style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+              style={{
+              backgroundColor: theme.colors.surface,
+              borderWidth: 1,
+              borderColor: theme.colors.outlineVariant,
+            }}
             >
               <View className="flex-row items-center">
                 <View
@@ -165,18 +174,92 @@ export default function DiagnosticsScreen() {
 
                     const shown = infos.reduce((n, f) => n + f.shown, 0);
                     const fetched = infos.reduce((n, f) => n + f.fetched, 0);
+                    const dirsQueried = infos.reduce((n, f) => n + (f.dirsQueried ?? 0), 0);
+                    const dirsFailed = infos.reduce((n, f) => n + (f.dirsFailed ?? 0), 0);
+                    const dropped = infos.reduce(
+                      (n, f) => n + f.droppedNoTime + f.droppedArchived + (f.droppedNoDirectory ?? 0),
+                      0,
+                    );
                     const errors = infos
                       .map((f) => f.error)
                       .filter((e): e is string => !!e);
 
+                    const sse = sseByUrl[server.url];
+                    const sseState = sse?.state ?? "off";
+                    const sseStateText =
+                      sseState === "live"
+                        ? t("sse.live")
+                        : sseState === "connecting"
+                          ? t("sse.connecting")
+                          : sseState === "error"
+                            ? t("sse.error")
+                            : t("sse.off");
+                    const watcher = watcherByUrl[server.url];
+                    const watcherState = watcher?.state ?? "off";
+                    const watcherStateText =
+                      watcherState === "live"
+                        ? t("sse.live")
+                        : watcherState === "connecting"
+                          ? t("sse.connecting")
+                          : watcherState === "error"
+                            ? t("sse.error")
+                            : t("sse.off");
+
                     return (
-                      <Text
-                        className="text-xs mt-0.5"
-                        style={{ color: theme.colors.onSurfaceVariant }}
-                      >
-                        sessions {shown}/{fetched} · {infos.length} dirs
-                        {errors.length > 0 ? ` • ${errors[0]}` : ""}
-                      </Text>
+                      <>
+                        <Text
+                          className="text-xs mt-0.5"
+                          style={{ color: theme.colors.onSurfaceVariant }}
+                        >
+                          sessions {shown}/{fetched} · {dirsQueried} project dirs
+                          {dirsFailed > 0 ? ` (${dirsFailed} failed)` : ""}
+                          {dropped > 0 ? ` · ${dropped} dropped` : ""}
+                          {errors.length > 0 ? ` • ${errors[0]}` : ""}
+                        </Text>
+                        <Text
+                          className="text-xs mt-0.5"
+                          style={{ color: theme.colors.onSurfaceVariant }}
+                        >
+                          SSE {sseStateText}
+                          {sse?.lastEventAt
+                            ? ` · ${formatTimeAgo(new Date(sse.lastEventAt).toISOString(), t)}`
+                            : ""}
+                          {(sse?.errors ?? 0) > 0 ? ` · err ${sse?.errors}` : ""}
+                        </Text>
+                        <Text
+                          className="text-xs mt-0.5"
+                          style={{ color: theme.colors.onSurfaceVariant }}
+                        >
+                          {t("diagnostics.watcher")} {watcherStateText} ·{" "}
+                          {watcher?.dirs ?? 0} subscribed dirs
+                          {(watcher?.busy ?? 0) > 0 ? ` · busy ${watcher?.busy}` : ""}
+                          {watcher?.lastEventAt
+                            ? ` · ${formatTimeAgo(new Date(watcher.lastEventAt).toISOString(), t)}`
+                            : ""}
+                          {(watcher?.errors ?? 0) > 0 ? ` · err ${watcher?.errors}` : ""}
+                          {watcher?.lastNotifyAt
+                            ? ` · push ${formatTimeAgo(new Date(watcher.lastNotifyAt).toISOString(), t)}`
+                            : ""}
+                          {watcher?.lastNotifyError
+                            ? ` · push err: ${watcher.lastNotifyError.slice(0, 60)}`
+                            : ""}
+                          {watcher?.lastDoneAt
+                            ? ` · done ${formatTimeAgo(new Date(watcher.lastDoneAt).toISOString(), t)} (${watcher.lastDoneState ?? "?"})`
+                            : ""}
+                          {watcher?.lastPollAt
+                            ? ` · poll ${formatTimeAgo(new Date(watcher.lastPollAt).toISOString(), t)}`
+                            : ""}
+                          {watcher?.lastBgAt
+                            ? ` · bg ${formatTimeAgo(new Date(watcher.lastBgAt).toISOString(), t)}`
+                            : ""}
+                          {watcher?.lastFgAt
+                            ? ` · fg ${formatTimeAgo(new Date(watcher.lastFgAt).toISOString(), t)}`
+                            : ""}
+                          {watcher?.lastSpeakAt
+                            ? ` · read ${formatTimeAgo(new Date(watcher.lastSpeakAt).toISOString(), t)} ${(watcher.lastSpeakSid ?? "").slice(-6)} ${watcher.lastSpeakWhy ?? "?"}`
+                            : ""}
+                        </Text>
+                      </>
                     );
                   })()}
                 </View>
@@ -216,7 +299,11 @@ export default function DiagnosticsScreen() {
         </Text>
         <View
           className="rounded-[28px] p-4 mb-4"
-          style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+          style={{
+              backgroundColor: theme.colors.surface,
+              borderWidth: 1,
+              borderColor: theme.colors.outlineVariant,
+            }}
         >
           {blockedCount === 0 && allowedPaths.length === 0 && (
             <Text
@@ -324,6 +411,12 @@ export default function DiagnosticsScreen() {
           style={{ color: theme.colors.onSurfaceVariant }}
         >
           {t("diagnostics.reportNote")}
+        </Text>
+        <Text
+          className="text-xs mt-1 text-center font-mono"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
+          build {BUILD_ID}
         </Text>
       </View>
     </ScrollView>

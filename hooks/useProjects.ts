@@ -20,5 +20,7 @@ export function useProjects(server: Server) {
 
       return projectsResult.data || [];
     },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 }

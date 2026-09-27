@@ -36,8 +36,10 @@ export function SignatureCard({ children, onPress, style }: SignatureCardProps) 
       }}
       style={[
         {
-          backgroundColor: theme.colors.surfaceContainerHigh,
+          backgroundColor: theme.colors.surface,
           borderRadius: SIGNATURE_RADIUS,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
         },
         style,
       ]}
