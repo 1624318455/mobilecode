@@ -8,4 +8,5 @@ appId: io.memeflyfly.mobilecode
     commands:
       - pressKey: Back
 - tapOn: "最近"
-- assertVisible: "最近"
+- assertVisible: ".*"
+- assertVisible: "本机"
