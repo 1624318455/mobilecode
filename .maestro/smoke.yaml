@@ -1,0 +1,4 @@
+appId: io.memeflyfly.mobilecode
+---
+- launchApp
+- assertVisible: "最近"
