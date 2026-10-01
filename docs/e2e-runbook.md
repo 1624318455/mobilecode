@@ -1,5 +1,8 @@
 # MobileCode 真机 E2E 手册（2026-10-01 实测沉淀）
 
+> 平台：Windows 11 + 无线 adb。含 Windows 特有写法（PowerShell、`adb pair` 文件重定向、
+> 盘符路径），Mac 机按自己环境翻译，命令级内容不可照抄。
+
 用 Maestro MCP + adb + 本地 `opencode serve` 在真机上跑端到端回归。
 无 Flutter 相关内容（本工程是 Expo RN，不需要 flutter-skill）。
 
