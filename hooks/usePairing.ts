@@ -1,8 +1,8 @@
 import { randomUUID } from "expo-crypto";
 import { useState } from "react";
 
-import { createClient } from "@/lib/opencode-client";
-import { isSecureOrigin, normalizeOrigin, parseQrPayload, QrPayload } from "@/lib/protocol";
+import { createV2Client } from "@/lib/v2client";
+import { isSecureOrigin, normalizeOrigin, isPairConnectLink, parsePairLink, parseQrPayload, probeV2Session, redeemPairCode, QrPayload } from "@/lib/protocol";
 import { useT } from "@/lib/i18n";
 import { saveDeviceToken } from "@/lib/secure";
 import { ConnectionMode, RemoteProvider, useAppStore } from "@/stores";
@@ -26,6 +26,16 @@ function translateError(message: string, t: TFn): string {
       return t("errors.linkEmptyHash");
     case "Please enter the pairing code":
       return t("errors.needCode");
+    case "Pairing link is not a /auth/connect link":
+      return t("errors.pairLink");
+    case "Pairing code is missing from link":
+      return t("errors.linkCode");
+    case "Pairing link expired or already used":
+      return t("errors.linkUsed");
+    case "Server returned no session token":
+      return t("errors.noToken");
+    case "Auth rejected (401) — re-pair this device":
+      return t("diagDetail.authExpired");
     default:
       return message;
   }
@@ -90,14 +100,15 @@ export function usePairing() {
       throw new Error(t("errors.httpsOnly"));
     }
 
-    const client = createClient({
+    const client = createV2Client({
       baseUrl: options.origin,
       username: options.username,
       password: options.password,
     });
-    const probe = await client.session.list().catch(() => null);
 
-    if (!probe || probe.error || !probe.data) {
+    try {
+      await client.session.list({ limit: 1 });
+    } catch {
       throw new Error(t("errors.noConnection"));
     }
 
@@ -167,6 +178,76 @@ export function usePairing() {
     return { serverId: created?.id || id, origin: options.origin };
   };
 
+  const saveV2Pairing = async (options: {
+    link: string;
+    customName: string;
+    mode: PairMode;
+    provider: PairProvider;
+  }): Promise<PairResult> => {
+    const { origin } = parsePairLink(options.link);
+
+    if (options.mode === "remote" && !isSecureOrigin(origin)) {
+      throw new Error(t("errors.httpsOnly"));
+    }
+
+    const token = await redeemPairCode(options.link);
+    await probeV2Session(origin, "opencode", token);
+
+    const tokenRef = randomUUID();
+    await saveDeviceToken(tokenRef, token);
+
+    try {
+      const host = new URL(origin).hostname;
+
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+        setLastSeenIp(host);
+      }
+    } catch {
+      // Origin already normalized — hostname parse cannot fail here.
+    }
+
+    const existing = servers.find((s) => s.url === origin);
+
+    if (existing) {
+      updateServer(existing.id, {
+        url: origin,
+        connectionMode: options.mode as ConnectionMode,
+        provider:
+          options.provider === "lan" ? undefined : options.provider,
+        instanceId: undefined,
+        caFingerprint: undefined,
+        deviceTokenRef: tokenRef,
+        username: "opencode",
+        password: token,
+        needsRepair: false,
+      });
+
+      return { serverId: existing.id, origin };
+    }
+
+    const id = randomUUID();
+    addServer({
+      name: options.customName.trim() || origin,
+      url: origin,
+      connectionMode: options.mode as ConnectionMode,
+      provider:
+        options.provider === "lan" ? undefined : options.provider,
+      instanceId: undefined,
+      caFingerprint: undefined,
+      deviceTokenRef: tokenRef,
+      username: "opencode",
+      password: token,
+    });
+
+    const created = useAppStore
+      .getState()
+      .servers.find(
+        (s) => s.url === origin && s.deviceTokenRef === tokenRef,
+      );
+
+    return { serverId: created?.id || id, origin };
+  };
+
   const runPairing = async (
     fn: () => Promise<PairResult>,
   ): Promise<PairResult | null> => {
@@ -189,7 +270,21 @@ export function usePairing() {
     qrJson: string,
     customName: string,
     mode: PairMode,
+    provider: PairProvider = "lan",
   ): Promise<PairResult | null> => {
+    if (isPairConnectLink(qrJson)) {
+      return runPairing(async () => {
+        const { link } = parsePairLink(qrJson);
+
+        return saveV2Pairing({
+          link,
+          customName,
+          mode,
+          provider,
+        });
+      });
+    }
+
     return runPairing(async () => {
       const payload: QrPayload = parseQrPayload(qrJson);
 
@@ -211,6 +306,19 @@ export function usePairing() {
     mode: PairMode,
     provider: PairProvider,
   ): Promise<PairResult | null> => {
+    if (isPairConnectLink(link)) {
+      return runPairing(async () => {
+        const { link: clean } = parsePairLink(link);
+
+        return saveV2Pairing({
+          link: clean,
+          customName,
+          mode,
+          provider,
+        });
+      });
+    }
+
     return runPairing(async () => {
       const { origin, code } = extractFromLink(link);
 

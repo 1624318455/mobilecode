@@ -1,8 +1,8 @@
-import type { Message, Part } from "@opencode-ai/sdk/v2";
+import type { ChatInfo, ChatPart } from "@/lib/v2messages";
 
 export interface DigestSource {
-  info: Message;
-  parts: Part[];
+  info: ChatInfo;
+  parts: ChatPart[];
 }
 
 interface ReasoningMetadata {
@@ -13,12 +13,14 @@ interface ReasoningMetadata {
 
 // A "poisoned" part carries encrypted reasoning bound to another caller.
 // Replaying it in a new run makes the provider reject the whole run.
-export function isPoisonedPart(part: Part): boolean {
+// (v2 reasoning arrives as plain text, so this is a no-op guard kept for
+// the fork-vs-fresh decision shape.)
+export function isPoisonedPart(part: ChatPart): boolean {
   if (part.type !== "reasoning") {
     return false;
   }
 
-  const metadata = part.metadata as ReasoningMetadata | undefined;
+  const metadata = (part as { metadata?: ReasoningMetadata }).metadata;
   const encrypted = metadata?.openai?.reasoningEncryptedContent;
 
   return typeof encrypted === "string" && encrypted.length > 0;
@@ -28,7 +30,7 @@ const MAX_MESSAGES = 40;
 const MAX_PER_TEXT = 500;
 const MAX_TOTAL_CHARS = 4000;
 
-function textOf(parts: Part[]): string {
+function textOf(parts: ChatPart[]): string {
   const out: string[] = [];
 
   for (const part of parts) {

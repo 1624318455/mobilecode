@@ -76,7 +76,7 @@ export default function PairServerScreen() {
     let result = null;
 
     if (method === "qr") {
-      result = await pairWithQr(qrJson, customName, mode);
+      result = await pairWithQr(qrJson, customName, mode, provider);
     } else if (method === "link") {
       result = await pairWithLink(link, customName, mode, provider);
     } else {

@@ -1,10 +1,11 @@
 import { useQueries } from "@tanstack/react-query";
-import { Session } from "@opencode-ai/sdk/v2";
+import type { SessionInfo as Session } from "@opencode/client";
 
 import { aggregateQueryKey } from "@/hooks/useAggregatedSessions";
 import { fetchAggregatedSessions } from "@/lib/sessionAggregate";
 import { normalizeDirectory } from "@/lib/sessionAggregate";
 import type { AggregateResult } from "@/lib/sessionAggregate";
+import { sessionDirectoryOf } from "@/lib/v2types";
 import { Server } from "@/stores";
 
 export interface RecentSession {
@@ -47,10 +48,6 @@ export function basenameOf(directory: string): string {
   return base || directory;
 }
 
-interface SessionLocation {
-  location?: { directory?: string };
-}
-
 interface SessionRuntime {
   agent?: string;
   model?: { id?: string };
@@ -63,17 +60,7 @@ interface SessionTime {
 }
 
 export function sessionDirectory(s: Session): string {
-  if (s.directory) {
-    return s.directory;
-  }
-
-  const loc = (s as Session & SessionLocation).location;
-
-  if (loc && typeof loc.directory === "string") {
-    return loc.directory;
-  }
-
-  return "";
+  return sessionDirectoryOf(s);
 }
 
 function normalizeSession(server: Server, s: Session): RecentSession | null {

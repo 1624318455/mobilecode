@@ -9,10 +9,10 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
-import type { PermissionRequest } from "@opencode-ai/sdk/v2";
+import type { PermissionRequest } from "@opencode/client";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
 import { isAskStale } from "@/lib/staleAsk";
 import { useT } from "@/lib/i18n";
 import { Server } from "@/stores";
@@ -26,6 +26,7 @@ interface PermissionBannerProps {
 function getPermissionLabel(permission: string, t: (key: string) => string): string {
   switch (permission) {
     case "bash":
+    case "shell":
       return t("permission.bash");
     case "edit":
       return t("permission.edit");
@@ -56,16 +57,16 @@ export function PermissionBanner({ request, server, directory }: PermissionBanne
 
   const replyMutation = useMutation({
     mutationFn: async ({ reply, message }: { reply: "once" | "always" | "reject"; message?: string }) => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
-        directory,
         username: server.username,
         password: server.password,
       });
 
       return client.permission.reply({
+        sessionID: request.sessionID,
         requestID: request.id,
-        reply,
+        decision: reply,
         message,
       });
     },
@@ -102,14 +103,14 @@ export function PermissionBanner({ request, server, directory }: PermissionBanne
     replyMutation.mutate({ reply: "reject" });
   }
 
-  const patterns = request.patterns ?? [];
-  const metadata = request.metadata ?? {};
+  const patterns = request.resources ?? [];
+  const metadata = (request.metadata ?? {}) as Record<string, unknown>;
   const command = metadata.command as string | undefined;
   const stale = isAskStale(
     queryClient,
     server.url,
     request.sessionID,
-    request.tool?.messageID,
+    request.source?.type === "tool" ? request.source.messageID : undefined,
   );
 
   return (
@@ -126,14 +127,14 @@ export function PermissionBanner({ request, server, directory }: PermissionBanne
     >
       {/* Header */}
         <View className="flex-row items-center gap-2 px-4 pt-3 pb-2">
-          {getPermissionIcon(request.permission, theme.colors.tertiary)}
+          {getPermissionIcon(request.action, theme.colors.tertiary)}
           <Text
             className="text-sm font-semibold flex-1"
             style={{ color: theme.colors.onTertiaryContainer }}
           >
             {stale
               ? t("permission.expired")
-              : getPermissionLabel(request.permission, t)}
+              : getPermissionLabel(request.action, t)}
           </Text>
         </View>
 

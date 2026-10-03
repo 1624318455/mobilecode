@@ -23,14 +23,13 @@ function prefixOf(ip: string): string | null {
   return `${parts[0]}.${parts[1]}.${parts[2]}`;
 }
 
-async function probe(
+async function probePath(
+  origin: string,
+  path: string,
+  started: number,
   ip: string,
-  port: number,
   signal: AbortSignal,
-): Promise<LanHost | null> {
-  const origin = `http://${ip}:${port}`;
-  const started = Date.now();
-
+): Promise<LanHost | "miss"> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
@@ -42,7 +41,7 @@ async function probe(
   signal.addEventListener("abort", onAbort);
 
   try {
-    await fetch(`${origin}/session`, {
+    await fetch(`${origin}${path}`, {
       method: "GET",
       signal: controller.signal,
     });
@@ -60,11 +59,34 @@ async function probe(
       return { ip, origin, latencyMs: Date.now() - started };
     }
 
-    return null;
+    return "miss";
   } finally {
     clearTimeout(timeout);
     signal.removeEventListener("abort", onAbort);
   }
+}
+
+async function probe(
+  ip: string,
+  port: number,
+  signal: AbortSignal,
+): Promise<LanHost | null> {
+  const origin = `http://${ip}:${port}`;
+  const started = Date.now();
+
+  for (const path of ["/api/info", "/session"]) {
+    if (signal.aborted) {
+      return null;
+    }
+
+    const hit = await probePath(origin, path, started, ip, signal);
+
+    if (hit !== "miss") {
+      return hit;
+    }
+  }
+
+  return null;
 }
 
 export function useLanSweep() {

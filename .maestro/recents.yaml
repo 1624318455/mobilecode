@@ -9,4 +9,4 @@ appId: io.memeflyfly.mobilecode
       - pressKey: Back
 - tapOn: "最近"
 - assertVisible: ".*"
-- assertVisible: "本机"
+- assertVisible: ".*个会话.*"

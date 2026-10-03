@@ -9,7 +9,7 @@ import { SkeletonRows } from "@/components/SkeletonRows";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { aggregateQueryKey } from "@/hooks/useAggregatedSessions";
 import { useSessions } from "@/hooks/useSessions";
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
 import { useT } from "@/lib/i18n";
 import { Server } from "@/stores";
 
@@ -42,21 +42,15 @@ export function ProjectSessions({ project, server, expanded = true }: ProjectSes
 
   const createSessionMutation = useMutation({
     mutationFn: async () => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
-        directory: project.path,
         username: server.username,
         password: server.password,
       });
-      const result = await client.session.create({
-        directory: project.path,
+
+      return client.session.create({
+        location: { directory: project.path },
       });
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      return result.data;
     },
     onSuccess: (session) => {
       queryClient.invalidateQueries({

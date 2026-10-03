@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
 import { Server } from "@/stores";
 
 export function useFileSearch(
@@ -17,19 +17,20 @@ export function useFileSearch(
       "fileSearch",
       query,
     ],
-    queryFn: async () => {
-      const client = createClient({
+    queryFn: async (): Promise<string[]> => {
+      const client = createV2Client({
         baseUrl: server.url,
-        directory: projectPath,
         username: server.username,
         password: server.password,
       });
-      const result = await client.find.files({
+      const result = await client.file.find({
         query,
-        dirs: "true",
+        location: projectPath ? { directory: projectPath } : undefined,
       });
 
-      return result.data || [];
+      return result.data.map((entry) =>
+        entry.type === "directory" ? `${entry.path}/` : entry.path,
+      );
     },
     enabled: !!projectPath,
     staleTime: 10_000,

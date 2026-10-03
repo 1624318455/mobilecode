@@ -1,7 +1,10 @@
-import type { Project, Session } from "@opencode-ai/sdk/v2";
+import type { Project, SessionInfo } from "@opencode/client";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import { projectWorktree } from "@/lib/v2types";
 import type { Server } from "@/stores";
+
+export type Session = SessionInfo;
 
 export interface DirFailure {
   directory: string;
@@ -48,23 +51,16 @@ function errorMessage(error: unknown): string {
 export async function fetchAggregatedSessions(
   server: Server,
 ): Promise<AggregateResult> {
-  const client = createClient({
+  const client = createV2Client({
     baseUrl: server.url,
     username: server.username,
     password: server.password,
   });
 
-  const [projectsResult, globalResult] = await Promise.all([
+  const [projects, globalSessions] = await Promise.all([
     client.project.list(),
-    client.session.list(),
+    client.session.list({ limit: 200 }).then((res) => res.data),
   ]);
-
-  if (globalResult.error) {
-    throw globalResult.error;
-  }
-
-  const projects = projectsResult.error ? [] : (projectsResult.data ?? []);
-  const globalSessions = globalResult.data ?? [];
 
   const byId = new Map<string, Session>();
 
@@ -82,32 +78,29 @@ export async function fetchAggregatedSessions(
   const directories: string[] = [];
 
   for (const p of projects) {
-    if (!p.worktree) {
+    const worktree = projectWorktree(p);
+
+    if (!worktree) {
       continue;
     }
 
-    const key = normalizeDirectory(p.worktree);
+    const key = normalizeDirectory(worktree);
 
     if (!seenDirs.has(key)) {
       seenDirs.add(key);
-      directories.push(p.worktree);
+      directories.push(worktree);
     }
   }
 
   for (const batch of chunk(directories, 5)) {
     const settled = await Promise.allSettled(
       batch.map(async (directory) => {
-        const dirClient = createClient({
+        const dirClient = createV2Client({
           baseUrl: server.url,
-          directory,
           username: server.username,
           password: server.password,
         });
-        const result = await dirClient.session.list({ directory });
-
-        if (result.error) {
-          throw result.error;
-        }
+        const result = await dirClient.session.list({ directory, limit: 200 });
 
         return { directory, sessions: result.data ?? [] };
       }),
@@ -184,10 +177,10 @@ export function resolveProjectPath(
   projects: Project[],
   fallbackDirectory?: string,
 ): string | undefined {
-  const direct = projects.find((p) => p.id === projectId)?.worktree;
+  const direct = projects.find((p) => p.id === projectId);
 
   if (direct) {
-    return direct;
+    return projectWorktree(direct);
   }
 
   try {
@@ -196,11 +189,11 @@ export function resolveProjectPath(
     if (decoded && decoded !== projectId) {
       const want = normalizeDirectory(decoded);
       const byPath = projects.find(
-        (p) => p.worktree && normalizeDirectory(p.worktree) === want,
-      )?.worktree;
+        (p) => normalizeDirectory(projectWorktree(p)) === want,
+      );
 
       if (byPath) {
-        return byPath;
+        return projectWorktree(byPath);
       }
 
       return decoded;

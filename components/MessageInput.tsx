@@ -36,6 +36,9 @@ interface MessageInputProps {
   server: Server;
   projectPath: string | undefined;
   usage?: ContextUsage | null;
+  isBusy?: boolean;
+  stopping?: boolean;
+  onStop?: () => void;
 }
 
 /** Unicode zero-width space used as invisible delimiters around mentions. */
@@ -158,6 +161,9 @@ export function MessageInput({
   server,
   projectPath,
   usage,
+  isBusy,
+  stopping,
+  onStop,
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [mentionedPaths, setMentionedPaths] = useState<Set<string>>(
@@ -395,14 +401,25 @@ export function MessageInput({
             </Text>
           </TextInput>
           <IconButton
-            icon="send"
+            icon={isBusy ? "stop" : "send"}
             mode="contained"
             size={20}
-            onPress={handleSend}
-            disabled={!hasContent || disabled}
-            accessibilityLabel={t("a11y.send")}
+            onPress={() => {
+              if (isBusy) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onStop?.();
+                return;
+              }
+              handleSend();
+            }}
+            disabled={isBusy ? !!stopping : !hasContent || disabled}
+            accessibilityLabel={isBusy ? t("sessionBusy.abort") : t("a11y.send")}
             accessibilityRole="button"
-            style={{ marginLeft: 8, marginBottom: 2 }}
+            style={{
+              marginLeft: 8,
+              marginBottom: 2,
+              ...(isBusy ? { backgroundColor: theme.colors.error } : null),
+            }}
           />
         </View>
 

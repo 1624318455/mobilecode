@@ -22,7 +22,8 @@ Hard traps (all verified 2026-10-01):
    tapped by hierarchy bounds center, never by screenshot eyeballing.
 4. Phone must be left alone during automation; user foreground steals assertions.
 5. New sessions take minutes to appear in recents; wait, then pull-to-refresh.
-6. Always pass an explicit good model in `prompt_async`; sessions inherit the
-   last (possibly broken) model otherwise.
+6. v2 建会话时定 model（`prompt` 无 model 参数）；坏 model 会话删了重建，
+   别复用。`prompt_async`/`abort`/`question` 都是 v1 写法，v2 对应
+   `prompt`/`interrupt`/`form`，见 runbook §5。
 
 Live staging one-liners and the verified verdict table live in the runbook §5/§7.

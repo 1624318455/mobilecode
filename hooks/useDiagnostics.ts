@@ -1,7 +1,8 @@
 import * as Application from "expo-application";
 import { useCallback, useState } from "react";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import { isAuthError } from "@/lib/v2types";
 import { useT } from "@/lib/i18n";
 import { DiagnosticReport, PROTOCOL_VERSION, WsRule } from "@/lib/protocol";
 import { Server } from "@/stores";
@@ -32,42 +33,23 @@ export function useDiagnostics(servers: Server[]) {
     };
 
     try {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
         username: server.username,
         password: server.password,
       });
-      const res = await client.session.list();
+      const res = await client.session.list({ limit: 1 });
 
-      if (res.data && !res.error) {
-        result = {
-          state: "ok",
-          latencyMs: Date.now() - started,
-          detail: t("diagDetail.sessions", { n: res.data.length }),
-        };
-      } else {
-        const text = JSON.stringify(res.error);
-
-        if (text.includes("401")) {
-          result = {
-            state: "expired",
-            latencyMs: Date.now() - started,
-            detail: t("diagDetail.authExpired"),
-          };
-        } else {
-          result = {
-            state: "down",
-            latencyMs: Date.now() - started,
-            detail: t("diagDetail.serverError"),
-          };
-        }
-      }
+      result = {
+        state: "ok",
+        latencyMs: Date.now() - started,
+        detail: t("diagDetail.sessions", { n: res.data.length }),
+      };
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Check failed";
-
-      if (message.includes("401") || message.toLowerCase().includes("unauthorized")) {
+      if (isAuthError(err)) {
         result = { state: "expired", latencyMs: null, detail: t("diagDetail.authExpired") };
       } else {
+        const message = err instanceof Error ? err.message : "Check failed";
         result = { state: "down", latencyMs: null, detail: message };
       }
     }

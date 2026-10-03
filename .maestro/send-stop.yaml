@@ -1,0 +1,16 @@
+appId: io.memeflyfly.mobilecode
+---
+- launchApp:
+    stopApp: false
+- tapOn: "最近"
+- assertVisible: "最近"
+# 进第一个会话（标题含 移除busy条）
+- tapOn: "移除busy条.*"
+# 聊天页：输入区发送键（空闲态 content-desc=发送消息；忙碌态=中止）
+- assertVisible: "发送消息|中止"
+- takeScreenshot: chat_input
+# 右上角设置
+- tapOn: "会话设置"
+- assertVisible: "分支继续"
+- assertVisible: "压缩历史"
+- takeScreenshot: chat_settings

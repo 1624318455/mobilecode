@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
 import { Server } from "@/stores";
 
 export type SessionBusyState = "idle" | "busy" | "retry";
@@ -12,10 +12,10 @@ export interface SessionRunState {
   next: number | null;
 }
 
-// Scoped session status (the endpoint only reports sessions under the
-// given directory — an unscoped call reads empty). Polled while a session
-// is open so a busy/retrying session surfaces instead of silently
-// swallowing sends.
+// Busy detection via the active-session map (v2 removed the per-directory
+// status endpoint). Absent from the map means idle; the retry flavor no
+// longer exists server-side, so message/next stay null and the UI falls
+// back to its generic busy treatment.
 export function useSessionStatus(
   server: Server,
   sessionId: string,
@@ -24,34 +24,15 @@ export function useSessionStatus(
   return useQuery({
     queryKey: ["server", server.url, "session", sessionId, "status"],
     queryFn: async (): Promise<SessionRunState> => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
-        directory,
         username: server.username,
         password: server.password,
       });
-      const result = await client.session.status({ directory });
+      const active = await client.session.active();
 
-      if (result.error) {
-        throw result.error;
-      }
-
-      const entry = (result.data ?? {})[sessionId];
-
-      if (!entry) {
-        return { state: "idle", message: null, next: null };
-      }
-
-      if (entry.type === "busy") {
+      if (active[sessionId]) {
         return { state: "busy", message: null, next: null };
-      }
-
-      if (entry.type === "retry") {
-        return {
-          state: "retry",
-          message: entry.message ?? null,
-          next: entry.next ?? null,
-        };
       }
 
       return { state: "idle", message: null, next: null };

@@ -1,35 +1,58 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Message, Part } from "@opencode-ai/sdk/v2";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import type { ChatItem } from "@/lib/v2messages";
+import { normalizeV2Messages } from "@/lib/v2messages";
 import { Server } from "@/stores";
 
-export interface MessageItem {
-  info: Message;
-  parts: Part[];
-}
+export type MessageItem = ChatItem;
+
+const PAGE_LIMIT = 200;
+const MAX_PAGES = 8;
 
 export function useSessionMessages(server: Server, sessionId: string) {
   return useQuery({
     queryKey: ["server", server.url, "session", sessionId, "messages"],
     queryFn: async () => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
         username: server.username,
         password: server.password,
       });
-      // Verified against :4096 — the endpoint ignores `offset` and a
-      // truncated limit returns an unstable window that can miss newest
-      // messages indefinitely. So the limit must cover the whole session
-      // in ONE fetch (1500 covers the largest known session: 708 msgs in
-      // ~1s on LAN). Order is normalized client-side in sortedMessages.
-      const messagesResult = await client.session.messages({
-        sessionID: sessionId,
-        limit: 1500,
-      });
-      const all = ((messagesResult.data ?? []) as MessageItem[]).slice(0, 1500);
+      // v2 pages at most 200 per fetch with an opaque cursor (the v1
+      // endpoint ignored offsets, so one huge limit was the only option).
+      // Walk newest-first pages until the cursor runs out.
+      const all: ChatItem[] = [];
+      let cursor: string | undefined;
 
-      return all;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        // The server rejects `order` combined with `cursor`: order only the
+        // first page, follow-ups page purely by cursor (limit+cursor is fine).
+        const res =
+          cursor === undefined
+            ? await client.message.list({
+                sessionID: sessionId,
+                limit: PAGE_LIMIT,
+                order: "asc",
+              })
+            : await client.message.list({
+                sessionID: sessionId,
+                limit: PAGE_LIMIT,
+                cursor,
+              });
+
+        all.push(...normalizeV2Messages(res.data));
+
+        const next = res.cursor.next;
+
+        if (!next) {
+          break;
+        }
+
+        cursor = next;
+      }
+
+      return all.slice(0, PAGE_LIMIT * MAX_PAGES);
     },
     refetchInterval: 3000,
   });

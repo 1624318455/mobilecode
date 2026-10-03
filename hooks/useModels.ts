@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import { locationInput } from "@/lib/v2types";
 import { Server } from "@/stores";
 
 export interface ModelInfo {
@@ -20,42 +21,43 @@ export interface ContextUsage {
   modelName: string;
 }
 
-export async function fetchProviders(server: Server) {
-  const client = createClient({
+export async function fetchProviders(server: Server): Promise<ModelInfo[]> {
+  const client = createV2Client({
     baseUrl: server.url,
     username: server.username,
     password: server.password,
   });
+  const result = await client.model.list(locationInput());
 
-  return (await client.provider.list()).data;
+  return result.data
+    .filter((m) => m.enabled)
+    .map((m) => ({
+      id: m.modelID,
+      providerID: m.providerID,
+      name: m.name,
+      limitContext: m.limit?.context,
+    }));
 }
 
-export function useModels(server: Server) {
+export function useModels(server: Server, directory?: string) {
   return useQuery({
     queryKey: ["server", server.url, "providers"],
-    queryFn: () => fetchProviders(server),
-    select: (data) => {
-      if (!data) {
-        return [];
-      }
+    queryFn: async (): Promise<ModelInfo[]> => {
+      const client = createV2Client({
+        baseUrl: server.url,
+        username: server.username,
+        password: server.password,
+      });
+      const result = await client.model.list(locationInput(directory));
 
-      const connected = new Set(data.connected || []);
-
-      return (data.all || [])
-        .filter((p) => connected.has(p.id))
-        .flatMap((p) =>
-          Object.values(p.models || {})
-            .filter((m) => m.id && m.name)
-            .map((m) => ({
-              id: m.id,
-              providerID: p.id,
-              name: m.name,
-              limitContext:
-                typeof m.limit?.context === "number"
-                  ? m.limit.context
-                  : undefined,
-            })),
-        );
+      return result.data
+        .filter((m) => m.enabled)
+        .map((m) => ({
+          id: m.modelID,
+          providerID: m.providerID,
+          name: m.name,
+          limitContext: m.limit?.context,
+        }));
     },
   });
 }

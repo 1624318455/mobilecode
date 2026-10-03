@@ -3,13 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { createV2Client } from "@/lib/v2client";
 import { Server } from "@/stores";
 
-export function usePermissions(
-  server: Server,
-  sessionId: string,
-  directory?: string,
-) {
+export function useSessionForms(server: Server, sessionId: string) {
   return useQuery({
-    queryKey: ["server", server.url, "session", sessionId, "permissions"],
+    queryKey: ["server", server.url, "session", sessionId, "forms"],
     queryFn: async () => {
       const client = createV2Client({
         baseUrl: server.url,
@@ -17,7 +13,7 @@ export function usePermissions(
         password: server.password,
       });
 
-      return client.permission.list({ sessionID: sessionId });
+      return client.session.form.list({ sessionID: sessionId });
     },
     refetchInterval: 1500,
   });

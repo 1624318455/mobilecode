@@ -2,7 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { aggregateQueryKey } from "@/hooks/useAggregatedSessions";
 import { sessionDirectory } from "@/hooks/useAllSessions";
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import { sessionDirectoryOf } from "@/lib/v2types";
 import type { AggregateResult } from "@/lib/sessionAggregate";
 import { isPrimarySession } from "@/lib/sessionAggregate";
 import { normalizeDirectory } from "@/lib/sessionAggregate";
@@ -39,14 +40,14 @@ export function useSessions(server: Server, projectPath?: string, enabled = true
         }
       : undefined,
     queryFn: async () => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
-        directory: projectPath,
         username: server.username,
         password: server.password,
       });
       const result = await client.session.list({
         directory: projectPath,
+        limit: 200,
       });
 
       return result.data || [];
@@ -68,7 +69,7 @@ export function useSessions(server: Server, projectPath?: string, enabled = true
             title: s.title || `Session ${s.id.slice(0, 8)}`,
             updatedAt: new Date(s.time.updated).toISOString(),
             projectID: s.projectID,
-            directory: s.directory,
+            directory: sessionDirectoryOf(s),
             agent: runtime.agent || undefined,
             modelName: runtime.model?.id || undefined,
           };

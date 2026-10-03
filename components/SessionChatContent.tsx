@@ -1,20 +1,12 @@
-import type {
-  AssistantMessage,
-  FilePart,
-  Message,
-  Part,
-  TextPart,
-  UserMessage,
-} from "@opencode-ai/sdk/v2";
+import type { ChatInfo, ChatPart, ChatTextPart } from "@/lib/v2messages";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { router, Stack, useFocusEffect } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { Check, Clock, GitFork, Hourglass, Settings, Volume2, VolumeX } from "lucide-react-native";
+import { Check, Clock, Settings, Volume2, VolumeX } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   NativeScrollEvent,
@@ -43,23 +35,23 @@ import { RecentSessionsDrawer } from "@/components/RecentSessionsDrawer";
 import {
   buildHistoryDigest,
   buildRescueText,
-  hasPoisonedHistory,
   setPendingDigest,
   takePendingDigest,
 } from "@/lib/historyDigest";
 import { PermissionBanner } from "@/components/PermissionBanner";
-import { QuestionBanner } from "@/components/QuestionBanner";
+import { FormBanner } from "@/components/FormBanner";
 import { useAgents } from "@/hooks/useAgents";
 import { useModels } from "@/hooks/useModels";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useProjects } from "@/hooks/useProjects";
 import { aggregateQueryKey } from "@/hooks/useAggregatedSessions";
-import { useQuestions } from "@/hooks/useQuestions";
+import { useSessionForms } from "@/hooks/useSessionForms";
 import { useServerEvents } from "@/hooks/useServerEvents";
 import { useSessionMessages } from "@/hooks/useSessionMessages";
 import { useSessionStatus } from "@/hooks/useSessionStatus";
 import { Identifier } from "@/lib/id";
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import { sessionDirectoryOf } from "@/lib/v2types";
 import { resolveProjectPath } from "@/lib/sessionAggregate";
 import { setVisibleSessionKey } from "@/lib/visibleSession";
 import { Server, useAppStore } from "@/stores";
@@ -74,8 +66,8 @@ interface SessionChatContentProps {
 }
 
 type CachedMessage = {
-  info: Message;
-  parts: Part[];
+  info: ChatInfo;
+  parts: ChatPart[];
   optimistic?: boolean;
 };
 
@@ -83,20 +75,16 @@ type CachedMessage = {
 // them again (prevents fork→fail→fork loops when returning to the page).
 const rescuedErrorIds = new Set<string>();
 
-type OutgoingApiPart =
-  | { id: string; type: "text"; text: string }
-  | {
-      id: string;
-      type: "file";
-      mime: string;
-      url: string;
-      filename: string;
-      source: {
-        type: "file";
-        path: string;
-        text: { value: string; start: number; end: number };
-      };
-    };
+interface OutgoingFile {
+  uri: string;
+  name: string;
+  mention?: { start: number; end: number; text: string };
+}
+
+interface OutgoingMessage {
+  text: string;
+  files: OutgoingFile[];
+}
 
 // Slide-up + fade-in for the optimistic message only (server-confirmed
 // items render without animation so history never re-animates).
@@ -105,18 +93,12 @@ const OptimisticEntering = new Keyframe({
   100: { opacity: 1, transform: [{ translateY: 0 }] },
 }).duration(280);
 
-function buildApiParts(
+function buildOutgoing(
   text: string,
   files: MentionedFile[],
   projectPath: string | undefined,
-): OutgoingApiPart[] {
-  const parts: OutgoingApiPart[] = [
-    {
-      id: Identifier.ascending("part"),
-      type: "text",
-      text,
-    },
-  ];
+): OutgoingMessage {
+  const out: OutgoingFile[] = [];
 
   for (const file of files) {
     const isAbsolute =
@@ -125,26 +107,23 @@ function buildApiParts(
       ? file.path
       : `${(projectPath || "").replace(/[\\/]+$/, "")}/${file.path}`;
     const filename = file.path.split("/").pop() || file.path;
+    // The @mention token stays in the text for display; record its span
+    // so the server links the attachment back to the reference.
+    const token = `@${file.path}`;
+    const start = text.indexOf(token);
+    const entry: OutgoingFile = {
+      uri: `file://${filePath}`,
+      name: filename,
+    };
 
-    parts.push({
-      id: Identifier.ascending("part"),
-      type: "file",
-      mime: "text/plain",
-      url: `file://${filePath}`,
-      filename,
-      source: {
-        type: "file",
-        path: filePath,
-        text: {
-          value: `@${file.path}`,
-          start: 0,
-          end: file.path.length + 1,
-        },
-      },
-    });
+    if (start >= 0) {
+      entry.mention = { start, end: start + token.length, text: token };
+    }
+
+    out.push(entry);
   }
 
-  return parts;
+  return { text, files: out };
 }
 
 export function SessionChatContent({
@@ -170,25 +149,23 @@ export function SessionChatContent({
   const { data: session } = useQuery({
     queryKey: ["server", server.url, "sessions", sessionId],
     queryFn: async () => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
         username: server.username,
         password: server.password,
       });
-      const result = await client.session.get({
+
+      return client.session.get({
         sessionID: sessionId,
       });
-
-      return result.data;
     },
   });
 
+  const sessionDir = session ? sessionDirectoryOf(session) : "";
   const projectPath = resolveProjectPath(
     projectId,
     projects,
-    session?.directory ||
-      (session as { location?: { directory?: string } } | undefined)?.location
-        ?.directory,
+    sessionDir || undefined,
   );
 
   const sessionTitle =
@@ -216,15 +193,11 @@ export function SessionChatContent({
 
   const { data: agents = [] } = useAgents(server);
   const { data: models = [] } = useModels(server);
-  const { data: pendingQuestions = [] } = useQuestions(
-    server,
-    sessionId,
-    session?.directory || projectPath || undefined,
-  );
+  const { data: pendingForms = [] } = useSessionForms(server, sessionId);
   const { data: pendingPermissions = [] } = usePermissions(
     server,
     sessionId,
-    session?.directory || projectPath || undefined,
+    sessionDir || projectPath || undefined,
   );
 
   // Context usage: session cumulative tokens vs the running model's window.
@@ -276,7 +249,7 @@ export function SessionChatContent({
   const { data: sessionRun, dataUpdatedAt: statusAt } = useSessionStatus(
     server,
     sessionId,
-    session?.directory || projectPath || undefined,
+    sessionDir || projectPath || undefined,
   );
   // A dead run leaves no finish flag and the status query may keep failing
   // while holding stale data: treat anything older than 30s as unknown →
@@ -311,97 +284,6 @@ export function SessionChatContent({
   const sessionBusy = statusStale || statusStuck ? "idle" : (sessionRun?.state ?? "idle");
   const sessionActive = sessionBusy !== "idle";
 
-  const abortMutation = useMutation({
-    mutationFn: async () => {
-      const client = createClient({
-        baseUrl: server.url,
-        directory: projectPath,
-        username: server.username,
-        password: server.password,
-      });
-      const result = await client.session.abort({
-        sessionID: sessionId,
-        directory: projectPath,
-      });
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      return result.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["server", server.url, "session", sessionId, "status"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: messagesKey,
-      });
-    },
-  });
-
-  const confirmAbort = useCallback(() => {
-    Alert.alert(
-      t("sessionBusy.abortTitle"),
-      t("sessionBusy.abortMsg"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("sessionBusy.abort"),
-          style: "destructive",
-          onPress: () => abortMutation.mutate(),
-        },
-      ],
-    );
-  }, [abortMutation, t]);
-
-  const forkMutation = useMutation({
-    mutationFn: async () => {
-      const client = createClient({
-        baseUrl: server.url,
-        directory: projectPath,
-        username: server.username,
-        password: server.password,
-      });
-
-      if (historyPoisoned) {
-        const created = await client.session.create({
-          directory: projectPath,
-        });
-
-        if (created.error || !created.data) {
-          throw created.error ?? new Error("Create failed");
-        }
-
-        setPendingDigest(
-          created.data.id,
-          buildHistoryDigest(sortedMessages, sessionTitle),
-        );
-
-        return created.data;
-      }
-
-      const result = await client.session.fork({
-        sessionID: sessionId,
-        directory: projectPath,
-      });
-
-      if (result.error || !result.data) {
-        throw result.error ?? new Error("Fork failed");
-      }
-
-      return result.data;
-    },
-    onSuccess: (fork) => {
-      queryClient.invalidateQueries({
-        queryKey: aggregateQueryKey(server.url),
-      });
-      router.push(
-        `/server/${server.id}/project/${projectId}/session/${fork.id}`,
-      );
-    },
-  });
-
   const messagesKey = useMemo(
     () => ["server", server.url, "session", sessionId, "messages"] as const,
     [server.url, sessionId],
@@ -424,12 +306,6 @@ export function SessionChatContent({
   // Last observed session activity (any delta/part/message event for this
   // session): proves the run is working right now.
   const activityAtRef = useRef(0);
-  // Timestamp of the last LIVE-observed retry status event for this
-  // session. SSE events are live-only (no replay), so observing one is
-  // positive proof the server reported a wait just now — unlike the
-  // poll-derived entry, which is a write-only fossil the server never
-  // clears. Superseded by anything newer (terminal/user/activity/idle).
-  const liveRetryAtRef = useRef<number | null>(null);
 
   function pokeActivity(): void {
     activityAtRef.current = Date.now();
@@ -467,23 +343,9 @@ export function SessionChatContent({
           msg = {
             info: {
               id: b.messageID,
-              sessionID: sessionId,
               role: "assistant",
               time: { created: Date.now() },
-              parentID: "",
-              modelID: "",
-              providerID: "",
-              mode: "",
-              agent: "",
-              path: { cwd: "", root: "" },
-              cost: 0,
-              tokens: {
-                input: 0,
-                output: 0,
-                reasoning: 0,
-                cache: { read: 0, write: 0 },
-              },
-            } satisfies AssistantMessage,
+            },
             parts: [],
           };
         }
@@ -501,10 +363,8 @@ export function SessionChatContent({
             changed = true;
           }
         } else {
-          const stub: TextPart = {
+          const stub: ChatTextPart = {
             id: b.partID,
-            sessionID: sessionId,
-            messageID: b.messageID,
             type: "text",
             text: b.delta,
           };
@@ -561,16 +421,15 @@ export function SessionChatContent({
     };
   }, []);
 
-  // SSE subscription (P1): millisecond-level invalidation for ask/permission
-  // and message deltas. Polling hooks above stay as offline fallback.
-  // The server scopes /event by directory and drops everything without a
-  // match, so prefer the server-canonical session.directory over the
-  // route-derived projectPath.
+  // SSE subscription: millisecond-level invalidation for permission,
+  // forms and text deltas. Polling hooks above stay as offline fallback.
+  // v2 /api/event is a global firehose, so every branch filters by the
+  // envelope's data.sessionID itself.
   useServerEvents(server, {
-    directory: session?.directory || projectPath || undefined,
+    directory: sessionDir || projectPath || undefined,
     onEvent: (event) => {
       if (event.type === "permission.asked" || event.type === "permission.replied") {
-        if (event.properties.sessionID === sessionId) {
+        if (event.data.sessionID === sessionId) {
           queryClient.invalidateQueries({
             queryKey: ["server", server.url, "session", sessionId, "permissions"],
           });
@@ -582,13 +441,18 @@ export function SessionChatContent({
       }
 
       if (
-        event.type === "question.asked" ||
-        event.type === "question.replied" ||
-        event.type === "question.rejected"
+        event.type === "form.created" ||
+        event.type === "form.replied" ||
+        event.type === "form.cancelled"
       ) {
-        if (event.properties.sessionID === sessionId) {
+        const formSessionID =
+          event.type === "form.created"
+            ? event.data.form.sessionID
+            : event.data.sessionID;
+
+        if (formSessionID === sessionId) {
           queryClient.invalidateQueries({
-            queryKey: ["server", server.url, "session", sessionId, "questions"],
+            queryKey: ["server", server.url, "session", sessionId, "forms"],
           });
           queryClient.invalidateQueries({
             queryKey: ["server", server.url, "session", sessionId, "messages"],
@@ -597,67 +461,35 @@ export function SessionChatContent({
         return;
       }
 
-      // Streaming deltas: buffer + throttled cache patch (item 4),
-      // NOT a full refetch per token.
-      if (event.type === "message.part.delta") {
-        const p = event.properties;
-
-        if (p.sessionID === sessionId && p.field === "text" && p.delta) {
-          queueDelta(p.messageID, p.partID, p.delta);
-        }
-
-        return;
-      }
-
-      if (event.type === "message.part.updated") {
-        const part = event.properties.part;
-
-        if (part.sessionID === sessionId) {
-          pokeActivity();
-          // Canonical snapshot wins: drop buffered deltas for this part,
-          // then replace the whole part.
-          deltaBufRef.current = deltaBufRef.current.filter(
-            (b) => b.partID !== part.id,
+      // Streaming deltas: buffer + throttled cache patch, NOT a full
+      // refetch per token. The part id mirrors the normalizer
+      // (`${messageID}-${ordinal}`) so the stub merges into the
+      // canonical part when the page refetch lands.
+      if (event.type === "session.text.delta") {
+        if (
+          event.data.sessionID === sessionId &&
+          event.data.delta
+        ) {
+          queueDelta(
+            event.data.assistantMessageID,
+            `${event.data.assistantMessageID}-${event.data.ordinal}`,
+            event.data.delta,
           );
-          queryClient.setQueryData<CachedMessage[]>(messagesKey, (old) => {
-            if (!old) {
-              return old;
-            }
-
-            return old.map((m) =>
-              m.info.id === part.messageID
-                ? {
-                    ...m,
-                    parts: m.parts.some((pp) => pp.id === part.id)
-                      ? m.parts.map((pp) => (pp.id === part.id ? part : pp))
-                      : [...m.parts, part],
-                  }
-                : m,
-            );
-          });
         }
 
         return;
       }
 
-      if (event.type === "message.updated") {
-        const info = event.properties.info;
-
-        if (info.sessionID === sessionId) {
+      if (
+        event.type === "session.text.ended" ||
+        event.type === "session.step.streamed" ||
+        event.type === "session.tool.success" ||
+        event.type === "session.tool.failed"
+      ) {
+        if (event.data.sessionID === sessionId) {
           pokeActivity();
-          // finish set => stream over for this message: drop the cursor.
-          if (info.role === "assistant" && info.finish != null) {
-            clearStreaming(info.id);
-          }
-
-          queryClient.setQueryData<CachedMessage[]>(messagesKey, (old) => {
-            if (!old || !old.some((m) => m.info.id === info.id)) {
-              return old;
-            }
-
-            return old.map((m) =>
-              m.info.id === info.id ? { ...m, info } : m,
-            );
+          queryClient.invalidateQueries({
+            queryKey: messagesKey,
           });
         }
 
@@ -665,38 +497,78 @@ export function SessionChatContent({
       }
 
       if (
-        event.type === "message.removed" ||
-        event.type === "message.part.removed"
+        event.type === "session.execution.started" ||
+        event.type === "session.step.started" ||
+        event.type === "session.tool.called"
       ) {
-        queryClient.invalidateQueries({
-          queryKey: messagesKey,
-        });
+        if (event.data.sessionID === sessionId) {
+          pokeActivity();
+          seenBusyRef.current = true;
+        }
+
+        return;
+      }
+
+      if (
+        event.type === "session.execution.succeeded" ||
+        event.type === "session.execution.failed" ||
+        event.type === "session.execution.interrupted"
+      ) {
+        if (event.data.sessionID === sessionId) {
+          setStreamingIds([]);
+          queryClient.invalidateQueries({
+            queryKey: ["server", server.url, "sessions", sessionId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: messagesKey,
+          });
+          queryClient.invalidateQueries({
+            queryKey: aggregateQueryKey(server.url),
+          });
+          setIdleTick((n) => n + 1);
+        }
+
+        return;
+      }
+
+      if (
+        event.type === "session.inbox.enqueued" ||
+        event.type === "session.inbox.delivered"
+      ) {
+        if (event.data.sessionID === sessionId) {
+          queryClient.invalidateQueries({
+            queryKey: messagesKey,
+          });
+        }
+
+        return;
+      }
+
+      if (event.type === "session.usage.updated") {
+        if (event.data.sessionID === sessionId) {
+          queryClient.invalidateQueries({
+            queryKey: ["server", server.url, "sessions", sessionId],
+          });
+        }
+
         return;
       }
 
       if (event.type === "session.status" || event.type === "session.idle") {
-        if (event.properties.sessionID === sessionId) {
+        if (event.data.sessionID === sessionId) {
           if (event.type === "session.status") {
-            if (event.properties.status.type === "retry") {
-              liveRetryAtRef.current = Date.now();
-            } else {
-              liveRetryAtRef.current = null;
-            }
-
             if (
-              event.properties.status.type === "busy" ||
-              event.properties.status.type === "retry"
+              event.data.status.type === "busy" ||
+              event.data.status.type === "retry"
             ) {
               seenBusyRef.current = true;
             }
-          } else {
-            liveRetryAtRef.current = null;
           }
 
           if (
             event.type === "session.idle" ||
             (event.type === "session.status" &&
-              event.properties.status.type === "idle")
+              event.data.status.type === "idle")
           ) {
             setIdleTick((n) => n + 1);
           }
@@ -714,8 +586,9 @@ export function SessionChatContent({
 
       if (
         event.type === "session.created" ||
-        event.type === "session.updated" ||
-        event.type === "session.deleted"
+        event.type === "session.deleted" ||
+        event.type === "session.renamed" ||
+        event.type === "session.moved"
       ) {
         queryClient.invalidateQueries({
           queryKey: aggregateQueryKey(server.url),
@@ -942,14 +815,6 @@ export function SessionChatContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idleTick]);
 
-  // Poisoned history can never run again (server ignores fork cutoffs,
-  // delete/summarize don't cleanse — all verified): skip the dead
-  // full-fork hop and go straight to a fresh session carrying a digest.
-  const historyPoisoned = useMemo(
-    () => hasPoisonedHistory(sortedMessages),
-    [sortedMessages],
-  );
-
   // The bottom banner stack always shows every pending request, even
   // when the same request also renders inline in the message flow.
   // Hiding the banner on inline-match caused dead ends: when the tool
@@ -958,7 +823,7 @@ export function SessionChatContent({
   // looked stuck on "Busy". Duplicate UI is a minor cost; a missing
   // answer UI blocks the run, so banners stay authoritative.
   const bannerPermissions = pendingPermissions;
-  const bannerQuestions = pendingQuestions;
+  const bannerForms = pendingForms;
 
   // Left drawer with recently active sessions (replaces the back button).
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -980,13 +845,8 @@ export function SessionChatContent({
       return null;
     }
 
-    const err = newest.info.error as {
-      name?: unknown;
-      data?: { message?: unknown };
-    };
-    const haystack = `${typeof err.name === "string" ? err.name : ""} ${
-      typeof err.data?.message === "string" ? err.data.message : ""
-    }`;
+    const err = newest.info.error;
+    const haystack = `${err.name} ${err.message ?? ""}`;
 
     if (!/reasoning|encrypted/i.test(haystack)) {
       return null;
@@ -1006,7 +866,7 @@ export function SessionChatContent({
 
       const question = latestUser.parts
         .filter(
-          (p): p is Extract<Part, { type: "text" }> => p.type === "text",
+          (p): p is Extract<ChatPart, { type: "text" }> => p.type === "text",
         )
         .map((p) => p.text)
         .join("\n");
@@ -1017,48 +877,24 @@ export function SessionChatContent({
         buildHistoryDigest(sortedMessages, sessionTitle),
         question,
       );
-      const files: MentionedFile[] = latestUser.parts
-        .filter(
-          (p): p is Extract<Part, { type: "file" }> => p.type === "file",
-        )
-        .map((p) => {
-          const src = p.source;
-
-          if (src && (src.type === "file" || src.type === "symbol")) {
-            return { path: src.path };
-          }
-
-          return { path: p.url.replace(/^file:\/\//, "") };
-        });
-      const dir = session?.directory || projectPath || undefined;
-      const client = createClient({
+      const dir = sessionDir || projectPath || undefined;
+      const client = createV2Client({
         baseUrl: server.url,
-        directory: dir,
         username: server.username,
         password: server.password,
       });
-      // A fork copies poisoned history verbatim and can never run (the
-      // server ignores fork(messageID), Part.delete is a no-op, summarize
-      // doesn't cleanse — all verified). So rescue always starts clean.
-      const created = await client.session.create({ directory: dir });
+      // A fork copies poisoned history verbatim and can never run, so
+      // rescue always starts clean.
+      const created = await client.session.create(
+        dir ? { location: { directory: dir } } : undefined,
+      );
+      const newId = created.id;
 
-      if (created.error || !created.data) {
-        throw created.error ?? new Error("Create failed");
-      }
-
-      const newId = created.data.id;
-
-      const prompt = await client.session.promptAsync({
+      await client.session.prompt({
         sessionID: newId,
-        messageID: Identifier.ascending("message"),
-        agent: selectedAgent,
-        model: modelForSend,
-        parts: buildApiParts(text, files, dir),
+        id: Identifier.ascending("message"),
+        text,
       });
-
-      if (prompt.error) {
-        throw prompt.error;
-      }
 
       if (failedId) {
         rescuedErrorIds.add(failedId);
@@ -1127,34 +963,23 @@ export function SessionChatContent({
     void speech.speak(toSpeakableText(menuFor.text));
   }, [menuFor, speech]);
 
+  // v2 removed server-side share links: share the message text itself.
   const handleShare = useCallback(async () => {
+    if (!menuFor || !menuFor.text.trim()) {
+      return;
+    }
+
     setSharing(true);
 
     try {
-      const client = createClient({
-        baseUrl: server.url,
-        directory: projectPath,
-        username: server.username,
-        password: server.password,
-      });
-      const result = await client.session.share({
-        sessionID: sessionId,
-        directory: projectPath,
-      });
-      const url = result.data?.share?.url;
-
-      if (!url) {
-        throw new Error("No share url");
-      }
-
       setMenuFor(null);
-      await Share.share({ message: url });
+      await Share.share({ message: menuFor.text });
     } catch {
       Alert.alert(t("menu.share"), t("menu.shareFailed"));
     } finally {
       setSharing(false);
     }
-  }, [projectPath, server.password, server.url, server.username, sessionId, t]);
+  }, [menuFor, t]);
 
   useEffect(() => {
     if (speech.error) {
@@ -1168,7 +993,6 @@ export function SessionChatContent({
         <ChatMessage
           message={item}
           server={server}
-          pendingQuestions={pendingQuestions}
           pendingPermissions={pendingPermissions}
         selectablePartId={selectablePartId}
         onLongPressText={handleLongPressText}
@@ -1185,7 +1009,7 @@ export function SessionChatContent({
 
       return node;
     },
-    [server, pendingQuestions, pendingPermissions, selectablePartId, handleLongPressText, streamingIds, sessionActive],
+    [server, pendingPermissions, selectablePartId, handleLongPressText, streamingIds, sessionActive],
   );
 
   const handleChatScroll = useCallback(
@@ -1198,72 +1022,59 @@ export function SessionChatContent({
   );
 
   const latestUserMessage = sortedMessages.find((m) => m.info.role === "user");
-  const currentModel =
-    latestUserMessage?.info.role === "user"
-      ? {
-          modelID: latestUserMessage.info.model.modelID,
-          providerID: latestUserMessage.info.model.providerID,
-        }
-      : {
-          modelID: "big-pickle",
-          providerID: "opencode",
-        };
+  // v2 sessions carry the live agent/model selection (user messages do
+  // not), so the pickers sync from the session instead of the transcript.
+  const currentModel = session?.model
+    ? {
+        modelID: session.model.id,
+        providerID: session.model.providerID,
+      }
+    : {
+        modelID: "big-pickle",
+        providerID: "opencode",
+      };
 
-  // Track the latest user message by id: whenever a NEWER user message
-  // arrives (initial load finishing late, or a just-sent message), sync the
-  // agent/model pickers from it. A user override made through the picker
-  // survives because the message id does not change underneath it.
-  // Sessions with no user message yet fall back to the first model so the
-  // picker never renders empty.
-  const appliedMessageId = useRef<string | null>(null);
+  // Track the session selection by key: a NEWER key (fresh load, or the
+  // server applying a just-sent switch) syncs the pickers from it. A user
+  // override made through the picker survives because the key does not
+  // change underneath it. Sessions with no selection yet fall back to the
+  // first model so the picker never renders empty.
+  const appliedSessionKey = useRef<string | null>(null);
   useEffect(() => {
     if (models.length === 0) {
       return;
     }
 
-    if (
-      !latestUserMessage ||
-      latestUserMessage.info.role !== "user" ||
-      latestUserMessage.info.id === appliedMessageId.current
-    ) {
-      if (!latestUserMessage && appliedMessageId.current !== "none") {
-        if (!selectedModel) {
-          setSelectedModel(models[0]);
-        }
+    const key = session
+      ? `${session.id}@${session.agent ?? ""}@${session.model?.providerID ?? ""}/${session.model?.id ?? ""}`
+      : "none";
 
-        appliedMessageId.current = "none";
-      }
-
+    if (appliedSessionKey.current === key) {
       return;
     }
 
-    const agentFromMessage = latestUserMessage.info.agent;
+    appliedSessionKey.current = key;
 
     if (
-      agentFromMessage &&
-      agents.some((a) => a.name === agentFromMessage)
+      session?.agent &&
+      agents.some((a) => a.name === session.agent)
     ) {
-      setSelectedAgent(agentFromMessage);
+      setSelectedAgent(session.agent);
     }
 
-    if (models.length > 0) {
-      const matchFromMessage = models.find(
-        (m) =>
-          m.id === currentModel.modelID &&
-          m.providerID === currentModel.providerID,
-      );
+    const match = session?.model
+      ? models.find(
+          (m) =>
+            m.id === session.model?.id &&
+            m.providerID === session.model?.providerID,
+        )
+      : undefined;
 
-      setSelectedModel(matchFromMessage || models[0]);
-    }
-
-    appliedMessageId.current = latestUserMessage.info.id;
+    setSelectedModel(match || models[0]);
   }, [
     agents,
-    currentModel.modelID,
-    currentModel.providerID,
-    latestUserMessage,
     models,
-    selectedModel,
+    session,
     setSelectedAgent,
     setSelectedModel,
   ]);
@@ -1272,49 +1083,62 @@ export function SessionChatContent({
     ? { modelID: selectedModel.id, providerID: selectedModel.providerID }
     : currentModel;
 
-  // What the chip shows: prefer the picked model, but fall back to the model
-  // recorded on the latest user message so the name is correct on first paint
-  // instead of waiting for the provider catalog.
+  // What the chip shows: prefer the picked model, but fall back to the
+  // session selection so the name is correct on first paint instead of
+  // waiting for the provider catalog.
   const displayModel =
     selectedModel ||
-    (latestUserMessage?.info.role === "user"
+    (session?.model
       ? {
-          id: latestUserMessage.info.model.modelID,
-          providerID: latestUserMessage.info.model.providerID,
-          name: latestUserMessage.info.model.modelID,
+          id: session.model.id,
+          providerID: session.model.providerID,
+          name: session.model.id,
         }
       : undefined);
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({
       messageID,
-      apiParts,
+      outgoing,
     }: {
       messageID: string;
-      apiParts: OutgoingApiPart[];
+      outgoing: OutgoingMessage;
     }) => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
-        directory: projectPath,
         username: server.username,
         password: server.password,
       });
 
-      const result = await client.session.promptAsync({
-        sessionID: sessionId,
-        messageID,
-        agent: selectedAgent,
-        model: modelForSend,
-        parts: apiParts,
-      });
-
-      // Surface server rejections (e.g. locked session) through onError
-      // instead of silently succeeding with no data.
-      if (result.error) {
-        throw result.error;
+      // v2 prompts carry no agent/model: align the session first so the
+      // run uses what the pickers show.
+      if (selectedAgent && selectedAgent !== session?.agent) {
+        await client.session.switchAgent({
+          sessionID: sessionId,
+          agent: selectedAgent,
+        });
       }
 
-      return result.data;
+      if (
+        modelForSend &&
+        (modelForSend.modelID !== session?.model?.id ||
+          modelForSend.providerID !== session?.model?.providerID)
+      ) {
+        await client.session.switchModel({
+          sessionID: sessionId,
+          model: {
+            id: modelForSend.modelID,
+            providerID: modelForSend.providerID,
+          },
+        });
+      }
+
+      return client.session.prompt({
+        sessionID: sessionId,
+        id: messageID,
+        text: outgoing.text,
+        files: outgoing.files.length > 0 ? outgoing.files : undefined,
+      });
     },
     // Optimistic insert: the message appears instantly (with slide-up +
     // fade-in) instead of waiting seconds for the server round-trip.
@@ -1322,36 +1146,15 @@ export function SessionChatContent({
       await queryClient.cancelQueries({ queryKey: messagesKey });
       const prev = queryClient.getQueryData<CachedMessage[]>(messagesKey);
 
-      const cacheParts: Part[] = variables.apiParts.map((p) =>
-        p.type === "text"
-          ? ({
-              id: p.id,
-              sessionID: sessionId,
-              messageID: variables.messageID,
-              type: "text",
-              text: p.text,
-            } satisfies TextPart)
-          : ({
-              id: p.id,
-              sessionID: sessionId,
-              messageID: variables.messageID,
-              type: "file",
-              mime: p.mime,
-              url: p.url,
-              filename: p.filename,
-              source: p.source,
-            } satisfies FilePart),
-      );
       const optimistic: CachedMessage = {
         info: {
           id: variables.messageID,
-          sessionID: sessionId,
           role: "user",
           time: { created: Date.now() },
-          agent: selectedAgent,
-          model: modelForSend,
-        } satisfies UserMessage,
-        parts: cacheParts,
+        },
+        parts: [
+          { id: variables.messageID, type: "text", text: variables.outgoing.text },
+        ],
         optimistic: true,
       };
       queryClient.setQueryData<CachedMessage[]>(messagesKey, [
@@ -1392,39 +1195,39 @@ export function SessionChatContent({
       const finalText = pending ? buildRescueText(pending, text) : text;
       sendMessageMutation.mutate({
         messageID: Identifier.ascending("message"),
-        apiParts: buildApiParts(finalText, files, projectPath),
+        outgoing: buildOutgoing(finalText, files, projectPath),
       });
     },
     [projectPath, sendMessageMutation, sessionId],
   );
 
-  // Retry bar visibility, evidence-based only — a fossil record never
-  // clears server-side, so the ENTRY alone proves nothing:
-  // - live retry event observed just now (SSE is live-only): show, unless
-  //   something newer already superseded it (terminal/user/activity/idle);
-  // - user message sent >60s ago with zero activity since: the fresh run
-  //   might genuinely be queuing behind quota — show (self-clears on any
-  //   progress or completion).
-  // Everything else (quiet fossil, working run, finished tail) hides.
-  const newestIsUser = newestMessage?.info.role === "user";
-  const newestCreated = newestMessage?.info.time.created ?? 0;
-  const newestTerminal =
-    newestMessage?.info.role === "assistant" &&
-    newestMessage.info.finish != null;
-  const liveRetry = liveRetryAtRef.current;
-  const liveRetryValid =
-    liveRetry != null &&
-    !(newestTerminal && newestCreated > liveRetry) &&
-    !(newestIsUser && newestCreated > liveRetry) &&
-    !(activityAtRef.current > liveRetry);
-  const stalledFreshRun =
-    !!newestIsUser &&
-    Date.now() - newestCreated > 60000 &&
-    activityAtRef.current <= newestCreated;
-  const showRetryBar =
-    sessionRun?.state === "retry" &&
-    !newestTerminal &&
-    (liveRetryValid || stalledFreshRun);
+  // Send-button stop: while the session is running the send key morphs
+  // into a stop key (see MessageInput isBusy). No confirm — speed matters
+  // mid-stream; a mistaken tap just stops a run the user can resume.
+  const abortMutation = useMutation({
+    mutationFn: async () => {
+      const client = createV2Client({
+        baseUrl: server.url,
+        username: server.username,
+        password: server.password,
+      });
+
+      return client.session.interrupt({
+        sessionID: sessionId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["server", server.url, "session", sessionId, "status"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: messagesKey,
+      });
+    },
+    onError: (error) => {
+      Alert.alert(t("sessionBusy.abortTitle"), (error as Error).message);
+    },
+  });
 
   return (
     <>
@@ -1526,104 +1329,18 @@ export function SessionChatContent({
                 key={permission.id}
                 request={permission}
                 server={server}
-                directory={session?.directory || projectPath || undefined}
+                directory={sessionDir || projectPath || undefined}
               />
             ))}
 
-            {bannerQuestions.map((question) => (
-              <QuestionBanner
-                key={question.id}
-                request={question}
+            {bannerForms.map((form) => (
+              <FormBanner
+                key={form.id}
+                form={form}
                 server={server}
-                directory={session?.directory || projectPath || undefined}
               />
             ))}
 
-            {/* Retry bar only on evidence (see showRetryBar): a fossil
-                record alone never cries quota. Busy still shows whenever
-                non-idle (its own stuck rule already converged it). */}
-            {sessionBusy !== "idle" &&
-            (sessionRun?.state !== "retry" || showRetryBar) ? (
-              <View
-                className="mx-4 mb-2 flex-row items-center gap-2 px-4 py-3"
-                style={{
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: 28,
-                  borderWidth: 1,
-                  borderColor: theme.colors.outlineVariant,
-                }}
-                accessibilityLiveRegion="polite"
-              >
-                <Hourglass size={16} color={theme.colors.onSecondaryContainer} />
-                <Text
-                  className="flex-1 text-xs"
-                  style={{ color: theme.colors.onSecondaryContainer }}
-                >
-                  {sessionRun?.state === "retry" && sessionRun.message
-                    ? sessionRun.next
-                      ? `${sessionRun.message} ${t("sessionBusy.retryNext", {
-                          t: new Date(sessionRun.next).toLocaleTimeString(),
-                        })}`
-                      : sessionRun.message
-                    : t("sessionBusy.busy")}
-                </Text>
-                <Pressable
-                  onPress={() => forkMutation.mutate()}
-                  disabled={forkMutation.isPending}
-                  className="flex-row items-center gap-1 px-3 py-1.5"
-                  style={{
-                    backgroundColor: theme.colors.primary,
-                    borderRadius: 999,
-                    opacity: forkMutation.isPending ? 0.5 : 1,
-                  }}
-                  accessibilityRole="button"
-                >
-                  <GitFork size={14} color={theme.colors.onPrimary} />
-                  <Text
-                    className="text-xs font-semibold"
-                    style={{ color: theme.colors.onPrimary }}
-                  >
-                    {forkMutation.isPending
-                      ? t("sessionBusy.forking")
-                      : historyPoisoned
-                        ? t("sessionBusy.fresh")
-                        : t("sessionBusy.fork")}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={confirmAbort}
-                  disabled={abortMutation.isPending}
-                  className="items-center px-3 py-1.5"
-                  style={{
-                    borderColor: theme.colors.outline,
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    opacity: abortMutation.isPending ? 0.5 : 1,
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("sessionBusy.abort")}
-                >
-                  <Text
-                    className="text-xs"
-                    style={{ color: theme.colors.onSurface }}
-                  >
-                    {abortMutation.isPending
-                      ? t("sessionBusy.aborting")
-                      : t("sessionBusy.abort")}
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-            {forkMutation.error ? (
-              <Text
-                className="text-sm text-center px-4 pb-2"
-                style={{ color: theme.colors.error }}
-                accessibilityLiveRegion="polite"
-                accessibilityRole="alert"
-              >
-                {(forkMutation.error as Error).message}
-              </Text>
-            ) : null}
             {newestRunError && !rescueMutation.isSuccess ? (
               <View
                 className="mx-4 mb-2 flex-row items-center gap-2 px-4 py-3"
@@ -1681,6 +1398,9 @@ export function SessionChatContent({
               server={server}
               projectPath={projectPath}
               usage={contextUsage}
+              isBusy={sessionActive}
+              stopping={abortMutation.isPending}
+              onStop={() => abortMutation.mutate()}
             />
             {sendMessageMutation.error && (
               <Text

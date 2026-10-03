@@ -1,19 +1,16 @@
 import { memo } from "react";
 import { Text, View } from "react-native";
-import type { Message, Part, PermissionRequest, QuestionRequest } from "@opencode-ai/sdk/v2";
+import type { PermissionRequest } from "@opencode/client";
 
 import { ChatMessagePart, PartLongPress } from "./ChatMessagePart";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import type { ChatItem } from "@/lib/v2messages";
 import { Server } from "@/stores";
 import { TypingDots } from "./TypingDots";
 
 interface ChatMessageProps {
-  message: {
-    info: Message;
-    parts: Part[];
-  };
+  message: ChatItem;
   server?: Server;
-  pendingQuestions?: QuestionRequest[];
   pendingPermissions?: PermissionRequest[];
   selectablePartId?: string | null;
   onLongPressText?: (info: PartLongPress) => void;
@@ -24,7 +21,6 @@ interface ChatMessageProps {
 export const ChatMessage = memo(function ChatMessage({
   message,
   server,
-  pendingQuestions,
   pendingPermissions,
   selectablePartId,
   onLongPressText,
@@ -64,12 +60,12 @@ export const ChatMessage = memo(function ChatMessage({
             >
               {message.info.error.name}
             </Text>
-            {typeof message.info.error.data.message === "string" && (
+            {typeof message.info.error.message === "string" && (
               <Text
                 className="text-sm"
                 style={{ color: theme.colors.onErrorContainer }}
               >
-                {message.info.error.data.message}
+                {message.info.error.message}
               </Text>
             )}
           </View>
@@ -86,7 +82,6 @@ export const ChatMessage = memo(function ChatMessage({
           part={part}
           isUser={isUser}
           server={server}
-          pendingQuestions={pendingQuestions}
           pendingPermissions={pendingPermissions}
           selectable={selectablePartId === part.id}
           onLongPressText={onLongPressText}

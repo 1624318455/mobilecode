@@ -117,13 +117,13 @@ const en = {
     pNamed: "Named",
     pProxy: "Proxy",
     method: "Method",
-    mQr: "QR JSON",
+    mQr: "QR",
     mLink: "Link",
     mKey: "Key",
     deviceName: "Device name (optional)",
-    qrLabel: "Pasted QR content (JSON)",
+    qrLabel: "Pasted QR content (link or JSON)",
     linkLabel: "Pairing link",
-    linkPh: "https://192.168.1.10:3443/pair#code",
+    linkPh: "http://192.168.5.44:4096/auth/connect/pSb5wvPWJVmJYU1a5rXISA",
     originLabel: "Origin (https://IP:port)",
     originPh: "https://192.168.1.10:3443",
     codeLabel: "Pairing code (optional)",
@@ -139,7 +139,7 @@ const en = {
     lanOnly: "LAN only",
     noneFound: "No OpenCode servers answered on port {port}.",
     saved: "saved",    cameraNote:
-      "Camera scanning needs expo-camera (not installed yet) — paste the QR JSON for now. The pairing code is stored in the device keychain and only ever sent to the exact saved origin.",
+      "On the computer run `opencode pair` and paste the printed link (or its QR). Links work once and expire in 5 minutes. The session token is stored in the device keychain and only ever sent to the exact saved origin.",
     badPort: "Please enter a valid port (1–65535)",
   },
   chat: {
@@ -243,6 +243,10 @@ const en = {
     submit: "Submit",
     customPh: "Type your own answer...",
   },
+  form: {
+    yes: "Yes",
+    no: "No",
+  },
   device: {
     reachable: "Reachable",
     checking: "Checking…",
@@ -274,6 +278,9 @@ const en = {
     badVersion: "Unsupported protocol version",
     linkCode: "Pairing link has no code (?code= or #code)",
     linkEmptyHash: "Pairing link has no code after #",
+    pairLink: "Not a pairing link (expected …/auth/connect/…)",
+    linkUsed: "Pairing link expired or already used — run `opencode pair` for a new one",
+    noToken: "Server returned no session token",
     httpsOnly: "Origin must be https",
     needCode: "Please enter the pairing code",
     needServerUrl: "Please enter a server URL",
@@ -312,10 +319,6 @@ const en = {
   sessionSettings: {
     title: "Settings",
     model: "Model",
-    archive: "Archive Session",
-    archiving: "Archiving...",
-    archiveTitle: "Archive Session",
-    archiveMsg: "Are you sure you want to archive this session?",
     rename: "Rename",
     renamePh: "Session title",
     save: "Save",
@@ -323,6 +326,14 @@ const en = {
     deleteTitle: "Delete Session",
     deleteMsg:
       "Are you sure you want to permanently delete this session? This cannot be undone.",
+    fork: "Fork & continue",
+    forking: "Forking…",
+    compact: "Compact history",
+    compacting: "Compacting…",
+    compactDone: "Compaction started — check back for new messages.",
+    compactTitle: "Compact this session?",
+    compactMsg:
+      "History will be squeezed into a summary. Saves tokens on long sessions, but details will be lost.",
   },
   serverContent: {
     loading: "Loading projects...",

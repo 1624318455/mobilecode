@@ -6,8 +6,9 @@ import { AppState } from "react-native";
 import { aggregateQueryKey } from "@/hooks/useAggregatedSessions";
 import { sessionDirectory } from "@/hooks/useAllSessions";
 import { useT } from "@/lib/i18n";
-import { createClient } from "@/lib/opencode-client";
-import type { OpencodeClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import type { V2Client } from "@/lib/v2client";
+import { projectWorktree } from "@/lib/v2types";
 import { ReplyTracker } from "@/lib/replyTracker";
 import { subscribeServerEvents } from "@/lib/serverEvents";
 import type { Event } from "@/lib/serverEvents";
@@ -233,64 +234,65 @@ export function useReplyWatcher(servers: Server[]) {
 
       if (event.type === "session.status") {
         if (
-          event.properties.status.type === "busy" ||
-          event.properties.status.type === "retry"
+          event.data.status.type === "busy" ||
+          event.data.status.type === "retry"
         ) {
-          noteBusy(server, event.properties.sessionID);
+          noteBusy(server, event.data.sessionID);
         } else {
-          noteDone(server, event.properties.sessionID);
+          noteDone(server, event.data.sessionID);
         }
 
         return;
       }
 
       if (event.type === "session.idle") {
-        noteDone(server, event.properties.sessionID);
+        noteDone(server, event.data.sessionID);
 
         return;
       }
 
-      if (event.type === "session.error") {
-        if (event.properties.sessionID) {
-          tracker.noteIdle(unreadKey(server.id, event.properties.sessionID));
-          syncBusy(server);
-        }
+      if (event.type === "session.execution.started") {
+        noteBusy(server, event.data.sessionID);
 
         return;
       }
 
-      // Same never-typed escape hatch as SessionChatContent: the installed
-      // SDK union has no message.part.delta member, but the server emits it.
-      if (event.type === "message.part.delta") {
-        const p = event.properties;
-        noteBusy(server, p.sessionID);
+      if (
+        event.type === "session.execution.succeeded" ||
+        event.type === "session.execution.interrupted"
+      ) {
+        noteDone(server, event.data.sessionID);
 
         return;
       }
 
-      if (event.type === "message.part.updated") {
-        noteBusy(server, event.properties.part.sessionID);
+      if (event.type === "session.execution.failed") {
+        tracker.noteIdle(unreadKey(server.id, event.data.sessionID));
+        syncBusy(server);
 
         return;
       }
 
-      if (event.type === "message.updated") {
-        const info = event.properties.info;
+      if (
+        event.type === "session.text.delta" ||
+        event.type === "session.step.streamed" ||
+        event.type === "session.tool.called" ||
+        event.type === "session.inbox.enqueued"
+      ) {
+        noteBusy(server, event.data.sessionID);
 
-        if (info.role === "user") {
-          noteBusy(server, info.sessionID);
-        } else if (info.role === "assistant") {
-          // A terminally finished assistant message IS a completed reply —
-          // even when the busy edge was never observed (bridged sessions,
-          // missed events, subscription gaps). Intermediate tool steps
-          // (finish="tool-calls") only mark activity. Finish events are
-          // live-only, so a stale replay cannot false-trigger this.
-          noteBusy(server, info.sessionID);
+        return;
+      }
 
-          if (info.finish != null && info.finish !== INTERMEDIATE_FINISH) {
-            noteDone(server, info.sessionID);
-          }
-        }
+      if (
+        event.type === "permission.asked" ||
+        event.type === "form.created"
+      ) {
+        const formSessionID =
+          event.type === "form.created"
+            ? event.data.form.sessionID
+            : event.data.sessionID;
+        noteBusy(server, formSessionID);
 
         return;
       }
@@ -341,7 +343,7 @@ export function useReplyWatcher(servers: Server[]) {
       }
 
       try {
-        const client = createClient({
+        const client = createV2Client({
           baseUrl: server.url,
           username: server.username,
           password: server.password,
@@ -349,26 +351,25 @@ export function useReplyWatcher(servers: Server[]) {
 
         try {
           const result = await withFetchTimeout(client.project.list());
+          const seenWorktrees = new Set<string>();
+          const worktrees: string[] = [];
 
-          if (!result.error) {
-            const seenWorktrees = new Set<string>();
-            const worktrees: string[] = [];
+          for (const p of result ?? []) {
+            const worktree = projectWorktree(p);
 
-            for (const p of result.data ?? []) {
-              if (!p.worktree) {
-                continue;
-              }
-
-              const key = normalizeDirectory(p.worktree);
-
-              if (!seenWorktrees.has(key)) {
-                seenWorktrees.add(key);
-                worktrees.push(p.worktree);
-              }
+            if (!worktree) {
+              continue;
             }
 
-            return worktrees.slice(0, MAX_DIRS);
+            const key = normalizeDirectory(worktree);
+
+            if (!seenWorktrees.has(key)) {
+              seenWorktrees.add(key);
+              worktrees.push(worktree);
+            }
           }
+
+          return worktrees.slice(0, MAX_DIRS);
         } catch {
           // Discovery or timeout failed — fall through to no dirs.
         }
@@ -384,7 +385,7 @@ export function useReplyWatcher(servers: Server[]) {
     // scoped (verified: /session/status reads empty for idle sessions, so
     // it can never close the edge — this replaces that poll).
     async function readTail(
-      client: OpencodeClient,
+      client: V2Client,
       sessionId: string,
     ): Promise<MessageTail> {
       const none = (evaluated: boolean): MessageTail => ({
@@ -396,16 +397,12 @@ export function useReplyWatcher(servers: Server[]) {
 
       try {
         const result = await withFetchTimeout(
-          client.session.messages({
+          client.message.list({
             sessionID: sessionId,
-            limit: 1500,
+            limit: 200,
+            order: "desc",
           }),
         );
-
-        if (result.error) {
-          return none(false);
-        }
-
         const all = result.data ?? [];
 
         if (all.length === 0) {
@@ -416,18 +413,17 @@ export function useReplyWatcher(servers: Server[]) {
 
         for (const m of all) {
           if (
-            m.info.time.created > last.info.time.created ||
-            (m.info.time.created === last.info.time.created &&
-              m.info.id > last.info.id)
+            m.time.created > last.time.created ||
+            (m.time.created === last.time.created && m.id > last.id)
           ) {
             last = m;
           }
         }
 
-        const lastId = last.info.id;
+        const lastId = last.id;
 
-        if (last.info.role === "assistant" && last.info.finish != null) {
-          if (last.info.finish === INTERMEDIATE_FINISH) {
+        if (last.type === "assistant" && last.finish != null) {
+          if (last.finish === INTERMEDIATE_FINISH) {
             return { evaluated: true, finishedId: null, terminal: false, lastId };
           }
 
@@ -469,17 +465,14 @@ export function useReplyWatcher(servers: Server[]) {
         }
 
         try {
-          const client = createClient({
+          const client = createV2Client({
             baseUrl: server.url,
             username: server.username,
             password: server.password,
           });
-          const result = await withFetchTimeout(client.session.list());
-
-          if (result.error) {
-            continue;
-          }
-
+          const result = await withFetchTimeout(
+            client.session.list({ limit: 200 }),
+          );
           const live = new Map<string, boolean>();
           let budget = POLL_EVAL_BUDGET;
 

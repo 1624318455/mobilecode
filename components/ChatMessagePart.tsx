@@ -6,12 +6,13 @@ import {
   Text,
   View,
 } from "react-native";
-import type { Part, PermissionRequest, QuestionRequest, ToolPart } from "@opencode-ai/sdk/v2";
+import type { PermissionRequest } from "@opencode/client";
 
 import { MarkdownContent } from "./MarkdownContent";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useT } from "@/lib/i18n";
 import { splitCarriedText } from "@/lib/historyDigest";
+import type { ChatPart, ChatToolPart } from "@/lib/v2messages";
 import { Server } from "@/stores";
 import { ToolInvocation } from "./ToolInvocation";
 
@@ -23,10 +24,9 @@ export interface PartLongPress {
 }
 
 interface ChatMessagePartProps {
-  part: Part;
+  part: ChatPart;
   isUser: boolean;
   server?: Server;
-  pendingQuestions?: QuestionRequest[];
   pendingPermissions?: PermissionRequest[];
   selectable?: boolean;
   onLongPressText?: (info: PartLongPress) => void;
@@ -39,7 +39,6 @@ export const ChatMessagePart = memo(function ChatMessagePart({
   part,
   isUser,
   server,
-  pendingQuestions,
   pendingPermissions,
   selectable = false,
   onLongPressText,
@@ -207,14 +206,15 @@ export const ChatMessagePart = memo(function ChatMessagePart({
     return (
       <View className="w-full">
         <ToolInvocation
-          part={part as ToolPart}
+          part={part as ChatToolPart}
           server={server}
-          pendingQuestions={pendingQuestions}
           pendingPermissions={pendingPermissions}
         />
       </View>
     );
   }
 
+  // Reasoning internals stay hidden; question/file records are covered
+  // by their own cards or the mention chips in the text.
   return null;
 });

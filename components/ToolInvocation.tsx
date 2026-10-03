@@ -12,10 +12,11 @@ import {
 } from "lucide-react-native";
 import { cloneElement, isValidElement, memo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import type { PermissionRequest, QuestionRequest, ToolPart } from "@opencode-ai/sdk/v2";
+import type { PermissionRequest } from "@opencode/client";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useT } from "@/lib/i18n";
+import type { ChatToolPart } from "@/lib/v2messages";
 import { Server } from "@/stores";
 import { PermissionInlineCard } from "./AskInlineCard";
 import { StatusBadge } from "./StatusBadge";
@@ -23,27 +24,13 @@ import { StatusBadge } from "./StatusBadge";
 type ToolStatus = "pending" | "running" | "completed" | "error";
 
 interface ToolInvocationProps {
-  part: ToolPart;
+  part: ChatToolPart;
   server?: Server;
-  pendingQuestions?: QuestionRequest[];
   pendingPermissions?: PermissionRequest[];
 }
 
-function findQuestionRequest(
-  part: ToolPart,
-  pendingQuestions?: QuestionRequest[],
-): QuestionRequest | undefined {
-  if (!pendingQuestions) {
-    return undefined;
-  }
-
-  return pendingQuestions.find(
-    (q) => q.tool?.callID === part.callID && q.tool?.messageID === part.messageID,
-  );
-}
-
 function findPermissionRequest(
-  part: ToolPart,
+  part: ChatToolPart,
   pendingPermissions?: PermissionRequest[],
 ): PermissionRequest | undefined {
   if (!pendingPermissions) {
@@ -51,19 +38,22 @@ function findPermissionRequest(
   }
 
   return pendingPermissions.find(
-    (p) => p.tool?.callID === part.callID && p.tool?.messageID === part.messageID,
+    (p) =>
+      p.source?.type === "tool" &&
+      p.source.id === part.callID &&
+      p.source.messageID === part.messageID,
   );
 }
 
-function getToolStatus(part: ToolPart): ToolStatus {
+function getToolStatus(part: ChatToolPart): ToolStatus {
   return part.state.status as ToolStatus;
 }
 
-function getInput(part: ToolPart): Record<string, unknown> {
+function getInput(part: ChatToolPart): Record<string, unknown> {
   return (part.state.input ?? {}) as Record<string, unknown>;
 }
 
-function getOutput(part: ToolPart): string | undefined {
+function getOutput(part: ChatToolPart): string | undefined {
   if (part.state.status === "completed") {
     return part.state.output;
   }
@@ -71,7 +61,7 @@ function getOutput(part: ToolPart): string | undefined {
   return undefined;
 }
 
-function getMetadata(part: ToolPart): Record<string, unknown> {
+function getMetadata(part: ChatToolPart): Record<string, unknown> {
   if (part.state.status === "running" || part.state.status === "completed") {
     return (part.state.metadata ?? {}) as Record<string, unknown>;
   }
@@ -79,7 +69,7 @@ function getMetadata(part: ToolPart): Record<string, unknown> {
   return {};
 }
 
-function getError(part: ToolPart): string | undefined {
+function getError(part: ChatToolPart): string | undefined {
   if (part.state.status === "error") {
     return part.state.error;
   }
@@ -87,7 +77,7 @@ function getError(part: ToolPart): string | undefined {
   return undefined;
 }
 
-function getRunningTitle(part: ToolPart): string | undefined {
+function getRunningTitle(part: ChatToolPart): string | undefined {
   if (part.state.status === "running" || part.state.status === "completed") {
     const title = (part.state as { title?: unknown }).title;
 
@@ -253,7 +243,7 @@ function ToolCard({
 
 // -- Specialized tool renderers --
 
-function ReadToolDisplay({ part }: { part: ToolPart }) {
+function ReadToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -283,7 +273,7 @@ function ReadToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function WriteToolDisplay({ part }: { part: ToolPart }) {
+function WriteToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -315,7 +305,7 @@ function WriteToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function EditToolDisplay({ part }: { part: ToolPart }) {
+function EditToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -347,7 +337,7 @@ function EditToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function BashToolDisplay({ part }: { part: ToolPart }) {
+function BashToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -402,7 +392,7 @@ function BashToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function GlobToolDisplay({ part }: { part: ToolPart }) {
+function GlobToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -428,7 +418,7 @@ function GlobToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function GrepToolDisplay({ part }: { part: ToolPart }) {
+function GrepToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -458,7 +448,7 @@ function GrepToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function TaskToolDisplay({ part }: { part: ToolPart }) {
+function TaskToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -478,7 +468,7 @@ function TaskToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function QuestionToolDisplay({ part }: { part: ToolPart }) {
+function QuestionToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const status = getToolStatus(part);
@@ -487,7 +477,7 @@ function QuestionToolDisplay({ part }: { part: ToolPart }) {
   const metadata = getMetadata(part);
 
   // NOTE: the interactive inline card was removed on purpose — pending
-  // questions are answered from the bottom QuestionBanner only. This card
+  // forms are answered from the bottom FormBanner only. This card
   // stays as the read-only record (question text + answers).
   const questions = (input.questions ?? []) as {
     question: string;
@@ -559,7 +549,7 @@ function QuestionToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function WebFetchToolDisplay({ part }: { part: ToolPart }) {
+function WebFetchToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -578,7 +568,7 @@ function WebFetchToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function SkillToolDisplay({ part }: { part: ToolPart }) {
+function SkillToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -596,7 +586,7 @@ function SkillToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function TodoWriteToolDisplay({ part }: { part: ToolPart }) {
+function TodoWriteToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -675,7 +665,7 @@ function TodoWriteToolDisplay({ part }: { part: ToolPart }) {
 
 // -- Default fallback for unknown tools --
 
-function DefaultToolDisplay({ part }: { part: ToolPart }) {
+function DefaultToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -745,7 +735,7 @@ function DefaultToolDisplay({ part }: { part: ToolPart }) {
 
 const TOOL_RENDERERS: Record<
   string,
-  React.ComponentType<{ part: ToolPart }>
+  React.ComponentType<{ part: ChatToolPart }>
 > = {
   mcp_read: ReadToolDisplay,
   mcp_write: WriteToolDisplay,
