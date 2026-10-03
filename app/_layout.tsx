@@ -8,7 +8,9 @@ import {
 } from "expo-router/react-navigation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import { startAliveService, stopAliveService } from "mobilecode-alive";
 import { StrictMode, useEffect } from "react";
+import { Platform } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import "react-native-reanimated";
 import "../global.css";
@@ -16,7 +18,10 @@ import "../global.css";
 import { Material3ThemeProvider } from "@/components/Material3ThemeProvider";
 import { useColorScheme } from "@/components/useColorScheme";
 import { useReactQuerySetup } from "@/hooks/useReactQuerySetup";
+import { useReplyWatcher } from "@/hooks/useReplyWatcher";
 import { useT } from "@/lib/i18n";
+import { useAppStore } from "@/stores";
+import { useUnreadStore } from "@/stores/unread";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +68,43 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
+function ReplyWatcherHost() {
+  const servers = useAppStore((s) => s.servers);
+  const notifyEnabled = useUnreadStore((s) => s.notifyEnabled);
+  const unreadCount = useUnreadStore((s) => Object.keys(s.items).length);
+  const { t } = useT();
+  useReplyWatcher(servers);
+
+  // Foreground keep-alive (Android only): a low-importance persistent
+  // notification keeps the process — and the reply watcher — running when
+  // the app goes to background. Tied to the system-notification switch so
+  // turning it off removes the icon too. The try/catch covers stale builds
+  // that predate the native module.
+  // The bar doubles as an unread counter so the state is visible even when
+  // MIUI suppresses the separate heads-up popup.
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return;
+    }
+
+    try {
+      if (notifyEnabled) {
+        const message =
+          unreadCount > 0
+            ? t("notify.unreadCount", { n: unreadCount })
+            : t("notify.aliveMsg");
+        startAliveService(t("notify.aliveTitle"), message);
+      } else {
+        stopAliveService();
+      }
+    } catch {
+      // Native module missing — watcher still works in foreground.
+    }
+  }, [notifyEnabled, unreadCount, t]);
+
+  return null;
+}
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const { t } = useT();
@@ -70,8 +112,12 @@ function RootLayoutNav() {
   return (
     <StrictMode>
       <KeyboardProvider>
-        <Material3ThemeProvider>
+        <Material3ThemeProvider
+          sourceColor="#0052FF"
+          fallbackSourceColor="#0052FF"
+        >
           <QueryClientProvider client={queryClient}>
+            <ReplyWatcherHost />
             <ThemeProvider
               value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
             >

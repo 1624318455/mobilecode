@@ -1,6 +1,7 @@
 import * as Application from "expo-application";
 import * as Updates from "expo-updates";
 import { ExternalLink, Info, Trash2 } from "lucide-react-native";
+import { useCallback } from "react";
 import {
   Alert,
   Linking,
@@ -9,11 +10,15 @@ import {
   Text,
   View,
 } from "react-native";
+import { Switch } from "react-native-paper";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useAllSessions } from "@/hooks/useAllSessions";
 import { LocalePref, useAppStore } from "@/stores";
 import { resolveLocaleDebug, useT } from "@/lib/i18n";
+import { normalizeDirectory } from "@/lib/sessionAggregate";
+import { requestNotifyPermission } from "@/lib/systemNotify";
+import { useUnreadStore } from "@/stores/unread";
 
 const LANGUAGE_OPTIONS: { value: LocalePref; label: string; labelKey?: string }[] = [
   { value: "system", label: "", labelKey: "settings.langSystem" },
@@ -31,9 +36,23 @@ export default function SettingsScreen() {
   const setStartupBehavior = useAppStore((s) => s.setStartupBehavior);
   const localePref = useAppStore((s) => s.localePref);
   const setLocalePref = useAppStore((s) => s.setLocalePref);
+  const dotEnabled = useUnreadStore((s) => s.dotEnabled);
+  const notifyEnabled = useUnreadStore((s) => s.notifyEnabled);
+  const setDotEnabled = useUnreadStore((s) => s.setDotEnabled);
+  const setNotifyEnabled = useUnreadStore((s) => s.setNotifyEnabled);
   const localeDebug = resolveLocaleDebug(localePref);
   const { recentSessions } = useAllSessions(servers);
-  const projectCount = new Set(recentSessions.map((s) => s.projectId)).size;
+  // projectID is unreliable (server often stamps everything "global"),
+  // so count distinct directories instead. Normalize spellings of the same
+  // folder ("D:\proj" vs "D:/proj/") and scope by server: the same path on
+  // two machines is two projects.
+  const projectCount = new Set(
+    recentSessions.map((s) =>
+      s.directory
+        ? `${s.serverId}::${normalizeDirectory(s.directory)}`
+        : `${s.serverId}::${s.projectId}`,
+    ),
+  ).size;
 
   const version = Application.nativeApplicationVersion || "Unknown";
   const buildNumber = Application.nativeBuildVersion || "Unknown";
@@ -61,6 +80,23 @@ export default function SettingsScreen() {
     borderColor: selected ? theme.colors.primary : theme.colors.outline,
   });
 
+  const handleToggleNotify = useCallback(
+    async (value: boolean) => {
+      if (value) {
+        const granted = await requestNotifyPermission();
+
+        if (!granted) {
+          Alert.alert(t("notify.system"), t("notify.note"));
+
+          return;
+        }
+      }
+
+      setNotifyEnabled(value);
+    },
+    [setNotifyEnabled, t],
+  );
+
   return (
     <ScrollView
       className="flex-1"
@@ -69,8 +105,12 @@ export default function SettingsScreen() {
       <View className="p-4">
         {/* App Info */}
         <View
-          className="rounded-2xl p-4 mb-4"
-          style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+          className="rounded-[28px] p-4 mb-4"
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <View className="flex-row items-center mb-3">
             <Info size={20} color={theme.colors.primary} />
@@ -109,8 +149,12 @@ export default function SettingsScreen() {
 
         {/* Stats */}
         <View
-          className="rounded-2xl p-4 mb-4"
-          style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+          className="rounded-[28px] p-4 mb-4"
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <Text
             className="text-lg font-semibold mb-3"
@@ -125,12 +169,15 @@ export default function SettingsScreen() {
               borderBottomColor: theme.colors.outlineVariant,
             }}
           >
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>
+            <Text
+              style={{ color: theme.colors.onSurfaceVariant, flexShrink: 1 }}
+              numberOfLines={1}
+            >
               {t("settings.servers")}
             </Text>
             <Text
               className="font-medium"
-              style={{ color: theme.colors.onSurface }}
+              style={{ color: theme.colors.onSurface, flexShrink: 0 }}
             >
               {servers.length}
             </Text>
@@ -142,29 +189,43 @@ export default function SettingsScreen() {
               borderBottomColor: theme.colors.outlineVariant,
             }}
           >
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>{t("settings.projects")}</Text>
+            <Text
+              style={{ color: theme.colors.onSurfaceVariant, flexShrink: 1 }}
+              numberOfLines={1}
+            >
+              {t("settings.projects")}
+            </Text>
             <Text
               className="font-medium"
-              style={{ color: theme.colors.onSurface }}
+              style={{ color: theme.colors.onSurface, flexShrink: 0 }}
             >
               {projectCount}
             </Text>
           </View>
           <View className="flex-row justify-between py-2">
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>{t("settings.sessions")}</Text>
+            <Text
+              style={{ color: theme.colors.onSurfaceVariant, flexShrink: 1 }}
+              numberOfLines={1}
+            >
+              {t("settings.sessions")}
+            </Text>
             <Text
               className="font-medium"
-              style={{ color: theme.colors.onSurface }}
+              style={{ color: theme.colors.onSurface, flexShrink: 0 }}
             >
-              {recentSessions.length}
+              {t("settings.sessionsCount", { n: recentSessions.length })}
             </Text>
           </View>
         </View>
 
         {/* Startup */}
         <View
-          className="rounded-2xl p-4 mb-4"
-          style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+          className="rounded-[28px] p-4 mb-4"
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <Text
             className="text-lg font-semibold mb-3"
@@ -234,8 +295,12 @@ export default function SettingsScreen() {
 
         {/* Language */}
         <View
-          className="rounded-2xl p-4 mb-4"
-          style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+          className="rounded-[28px] p-4 mb-4"
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <Text
             className="text-lg font-semibold mb-3"
@@ -280,10 +345,71 @@ export default function SettingsScreen() {
           })}
         </View>
 
+        {/* Reply alerts */}
+        <View
+          className="rounded-[28px] p-4 mb-4"
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
+        >
+          <Text
+            className="text-lg font-semibold mb-3"
+            style={{ color: theme.colors.onSurface }}
+          >
+            {t("notify.title")}
+          </Text>
+          <View
+            className="flex-row items-center justify-between py-3"
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.outlineVariant,
+            }}
+          >
+            <View className="flex-1 mr-3">
+              <Text style={{ color: theme.colors.onSurface }}>
+                {t("notify.dot")}
+              </Text>
+              <Text
+                className="text-sm mt-0.5"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {t("notify.dotDesc")}
+              </Text>
+            </View>
+            <Switch value={dotEnabled} onValueChange={setDotEnabled} />
+          </View>
+          <View className="flex-row items-center justify-between py-3">
+            <View className="flex-1 mr-3">
+              <Text style={{ color: theme.colors.onSurface }}>
+                {t("notify.system")}
+              </Text>
+              <Text
+                className="text-sm mt-0.5"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {t("notify.systemDesc")}
+              </Text>
+            </View>
+            <Switch value={notifyEnabled} onValueChange={handleToggleNotify} />
+          </View>
+          <Text
+            className="text-xs mt-1"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            {t("notify.note")}
+          </Text>
+        </View>
+
         {/* Links */}
         <View
-          className="rounded-2xl p-4 mb-4"
-          style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+          className="rounded-[28px] p-4 mb-4"
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <Text
             className="text-lg font-semibold mb-3"
@@ -310,8 +436,12 @@ export default function SettingsScreen() {
 
         {/* Danger Zone */}
         <View
-          className="rounded-2xl p-4"
-          style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+          className="rounded-[28px] p-4"
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <Text
             className="text-lg font-semibold mb-3"

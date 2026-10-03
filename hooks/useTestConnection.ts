@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
 import { useT } from "@/lib/i18n";
 
 interface TestConnectionOptions {
@@ -29,23 +29,15 @@ export function useTestConnection() {
     setError(null);
 
     try {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: options.url.trim(),
         username: options.username,
         password: options.password,
       });
-      const result = await client.session.list();
+      await client.session.list({ limit: 1 });
+      setTestResult("success");
 
-      if (result.data && !result.error) {
-        setTestResult("success");
-
-        return true;
-      }
-
-      setTestResult("error");
-      setError(t("errors.noConnection"));
-
-      return false;
+      return true;
     } catch (err) {
       setTestResult("error");
       setError(err instanceof Error ? err.message : t("errors.failed"));

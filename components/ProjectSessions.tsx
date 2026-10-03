@@ -1,13 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { ChevronDown, ChevronUp, Folder, Plus } from "lucide-react-native";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react-native";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { SessionCard } from "@/components/SessionCard";
+import { SkeletonRows } from "@/components/SkeletonRows";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { aggregateQueryKey } from "@/hooks/useAggregatedSessions";
 import { useSessions } from "@/hooks/useSessions";
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
 import { useT } from "@/lib/i18n";
 import { Server } from "@/stores";
 
@@ -20,9 +22,12 @@ interface Project {
 interface ProjectSessionsProps {
   project: Project;
   server: Server;
+  expanded?: boolean;
 }
 
-export function ProjectSessions({ project, server }: ProjectSessionsProps) {
+const PREVIEW_LIMIT = 5;
+
+export function ProjectSessions({ project, server, expanded = true }: ProjectSessionsProps) {
   const theme = useAppTheme();
   const { t } = useT();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -32,29 +37,27 @@ export function ProjectSessions({ project, server }: ProjectSessionsProps) {
   const { data: sessions = [], isLoading } = useSessions(
     server,
     project.path,
+    expanded,
   );
 
   const createSessionMutation = useMutation({
     mutationFn: async () => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
-        directory: project.path,
         username: server.username,
         password: server.password,
       });
-      const result = await client.session.create({
-        directory: project.path,
+
+      return client.session.create({
+        location: { directory: project.path },
       });
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      return result.data;
     },
     onSuccess: (session) => {
       queryClient.invalidateQueries({
         queryKey: ["server", server.url, "project", project.path, "sessions"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: aggregateQueryKey(server.url),
       });
       if (session) {
         router.push(
@@ -65,61 +68,23 @@ export function ProjectSessions({ project, server }: ProjectSessionsProps) {
   });
 
   if (isLoading) {
-    return (
-      <View>
-        <View className="mb-3">
-          <View className="flex-row items-center">
-            <Folder size={16} color={theme.colors.onSurfaceVariant} />
-            <Text
-              className="text-sm font-semibold ml-2"
-              style={{ color: theme.colors.onSurface }}
-            >
-              {project.name}
-            </Text>
-          </View>
-          <Text
-            className="text-xs ml-6"
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            {project.path}
-          </Text>
-        </View>
-        <View className="py-4 items-center">
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        </View>
-      </View>
-    );
+    // Same footprint as PREVIEW_LIMIT session cards: no height jump when
+    // the real list arrives.
+    return <SkeletonRows count={PREVIEW_LIMIT} />;
   }
 
-  const displayedSessions = showAll ? sessions : sessions.slice(0, 3);
-  const hasMore = sessions.length > 3;
+  const displayedSessions = showAll ? sessions : sessions.slice(0, PREVIEW_LIMIT);
+  const hasMore = sessions.length > PREVIEW_LIMIT;
 
+  // Note: no project header here — the accordion row in ServerContent
+  // already shows name/path/count.
   return (
     <View>
-      {/* Project Header */}
-      <View className="mb-3">
-        <View className="flex-row items-center">
-          <Folder size={16} color={theme.colors.onSurfaceVariant} />
-          <Text
-            className="text-sm font-semibold ml-2"
-            style={{ color: theme.colors.onSurface }}
-          >
-            {project.name}
-          </Text>
-        </View>
-        <Text
-          className="text-xs ml-6"
-          style={{ color: theme.colors.onSurfaceVariant }}
-        >
-          {project.path}
-        </Text>
-      </View>
-
       {/* New Session Button */}
       <Pressable
         onPress={() => createSessionMutation.mutate()}
         disabled={createSessionMutation.isPending}
-        className="rounded-2xl p-3 flex-row items-center mb-2"
+        className="rounded-[28px] p-3 flex-row items-center mb-2"
         style={{ backgroundColor: theme.colors.secondaryContainer }}
       >
         {createSessionMutation.isPending ? (
@@ -149,6 +114,8 @@ export function ProjectSessions({ project, server }: ProjectSessionsProps) {
       {displayedSessions.map((session) => (
         <SessionCard
           key={session.id}
+          serverId={server.id}
+          sessionId={session.id}
           title={session.title}
           updatedAt={session.updatedAt}
           onPress={() =>
@@ -163,7 +130,7 @@ export function ProjectSessions({ project, server }: ProjectSessionsProps) {
       {hasMore && (
         <Pressable
           onPress={() => setShowAll(!showAll)}
-          className="rounded-2xl p-3 flex-row items-center justify-center mt-2"
+          className="rounded-[28px] p-3 flex-row items-center justify-center mt-2"
           style={{ backgroundColor: theme.colors.surfaceVariant }}
         >
           {showAll ? (
@@ -183,7 +150,7 @@ export function ProjectSessions({ project, server }: ProjectSessionsProps) {
                 className="ml-2 text-sm"
                 style={{ color: theme.colors.onSurfaceVariant }}
               >
-                {t("projectSessions.viewMore", { n: sessions.length - 3 })}
+                {t("projectSessions.viewMore", { n: sessions.length - PREVIEW_LIMIT })}
               </Text>
             </>
           )}

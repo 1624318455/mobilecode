@@ -9,6 +9,7 @@ interface WsRuleState {
   allowedPaths: string[];
   allowPath: (path: string) => void;
   removePath: (path: string) => void;
+  clearRules: () => void;
 }
 
 function normalizePath(path: string): string {
@@ -43,6 +44,10 @@ export const useWsRules = create<WsRuleState>()(
         set((state) => ({
           allowedPaths: state.allowedPaths.filter((p) => p !== path),
         })),
+      clearRules: () => {
+        set({ allowedPaths: [] });
+        zustandStorage.removeItem(STORE_NAME);
+      },
     }),
     {
       name: STORE_NAME,

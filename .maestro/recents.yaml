@@ -1,0 +1,12 @@
+appId: io.memeflyfly.mobilecode
+---
+- launchApp:
+    stopApp: false
+- runFlow:
+    when:
+      notVisible: "最近"
+    commands:
+      - pressKey: Back
+- tapOn: "最近"
+- assertVisible: ".*"
+- assertVisible: ".*个会话.*"

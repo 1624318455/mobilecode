@@ -12,27 +12,48 @@ import {
 } from "lucide-react-native";
 import { cloneElement, isValidElement, memo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import type { ToolPart } from "@opencode-ai/sdk/v2";
+import type { PermissionRequest } from "@opencode/client";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useT } from "@/lib/i18n";
+import type { ChatToolPart } from "@/lib/v2messages";
+import { Server } from "@/stores";
+import { PermissionInlineCard } from "./AskInlineCard";
 import { StatusBadge } from "./StatusBadge";
 
 type ToolStatus = "pending" | "running" | "completed" | "error";
 
 interface ToolInvocationProps {
-  part: ToolPart;
+  part: ChatToolPart;
+  server?: Server;
+  pendingPermissions?: PermissionRequest[];
 }
 
-function getToolStatus(part: ToolPart): ToolStatus {
+function findPermissionRequest(
+  part: ChatToolPart,
+  pendingPermissions?: PermissionRequest[],
+): PermissionRequest | undefined {
+  if (!pendingPermissions) {
+    return undefined;
+  }
+
+  return pendingPermissions.find(
+    (p) =>
+      p.source?.type === "tool" &&
+      p.source.id === part.callID &&
+      p.source.messageID === part.messageID,
+  );
+}
+
+function getToolStatus(part: ChatToolPart): ToolStatus {
   return part.state.status as ToolStatus;
 }
 
-function getInput(part: ToolPart): Record<string, unknown> {
+function getInput(part: ChatToolPart): Record<string, unknown> {
   return (part.state.input ?? {}) as Record<string, unknown>;
 }
 
-function getOutput(part: ToolPart): string | undefined {
+function getOutput(part: ChatToolPart): string | undefined {
   if (part.state.status === "completed") {
     return part.state.output;
   }
@@ -40,7 +61,7 @@ function getOutput(part: ToolPart): string | undefined {
   return undefined;
 }
 
-function getMetadata(part: ToolPart): Record<string, unknown> {
+function getMetadata(part: ChatToolPart): Record<string, unknown> {
   if (part.state.status === "running" || part.state.status === "completed") {
     return (part.state.metadata ?? {}) as Record<string, unknown>;
   }
@@ -48,9 +69,21 @@ function getMetadata(part: ToolPart): Record<string, unknown> {
   return {};
 }
 
-function getError(part: ToolPart): string | undefined {
+function getError(part: ChatToolPart): string | undefined {
   if (part.state.status === "error") {
     return part.state.error;
+  }
+
+  return undefined;
+}
+
+function getRunningTitle(part: ChatToolPart): string | undefined {
+  if (part.state.status === "running" || part.state.status === "completed") {
+    const title = (part.state as { title?: unknown }).title;
+
+    if (typeof title === "string" && title.trim()) {
+      return title;
+    }
   }
 
   return undefined;
@@ -110,17 +143,22 @@ function ToolCard({
     ? cloneElement(icon, { color: theme.colors.onSurfaceVariant })
     : icon;
 
+  // Busy cards must stay informative AND expandable: hiding the
+  // subtitle/args while running left users staring at a bare
+  // "Shell · Busy" with no way to see which command was running.
   return (
     <View
       className="mt-2 overflow-hidden"
       style={{
-        backgroundColor: theme.colors.surfaceContainer,
-        borderRadius: 16,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
       }}
     >
       <Pressable
         onPress={() => {
-          if (hasDetails && !pending) {
+          if (hasDetails) {
             setExpanded(!expanded);
           }
         }}
@@ -139,7 +177,7 @@ function ToolCard({
           >
             {title}
           </Text>
-          {!pending && subtitle ? (
+          {subtitle ? (
             <Text
               className="text-sm flex-shrink"
               style={{ color: theme.colors.onSurfaceVariant }}
@@ -148,7 +186,7 @@ function ToolCard({
               {subtitle}
             </Text>
           ) : null}
-          {!pending && args
+          {args
             ? args.map((arg, i) => (
                 <Text
                   key={i}
@@ -166,7 +204,7 @@ function ToolCard({
             <StatusBadge status="error" size="sm" />
           ) : null}
         </View>
-        {hasDetails && !pending ? (
+        {hasDetails ? (
           expanded ? (
             <ChevronUp size={14} color={theme.colors.onSurfaceVariant} />
           ) : (
@@ -205,7 +243,7 @@ function ToolCard({
 
 // -- Specialized tool renderers --
 
-function ReadToolDisplay({ part }: { part: ToolPart }) {
+function ReadToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -235,7 +273,7 @@ function ReadToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function WriteToolDisplay({ part }: { part: ToolPart }) {
+function WriteToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -267,7 +305,7 @@ function WriteToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function EditToolDisplay({ part }: { part: ToolPart }) {
+function EditToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -299,7 +337,7 @@ function EditToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function BashToolDisplay({ part }: { part: ToolPart }) {
+function BashToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -308,25 +346,33 @@ function BashToolDisplay({ part }: { part: ToolPart }) {
   const output = getOutput(part);
   const command = input.command as string | undefined;
   const description = input.description as string | undefined;
+  const runningTitle = getRunningTitle(part);
 
   const shellOutput = (() => {
-    if (!command && !output) {
+    if (!command && !output && !runningTitle) {
       return undefined;
     }
 
     const cmd = command ?? "";
     const out = output ?? "";
+    const head = runningTitle && runningTitle !== cmd ? `${runningTitle}\n` : "";
 
-    return `$ ${cmd}${out ? "\n\n" + out : ""}`;
+    return `${head}$ ${cmd}${out ? "\n\n" + out : ""}`;
   })();
+
+  // While running there is no output yet: fall back to the live title or
+  // the command itself so the collapsed row still tells what is busy.
+  const subtitle =
+    description || runningTitle || (command ? command.slice(0, 60) : undefined);
 
   return (
     <ToolCard
       icon={<Terminal size={14} />}
       title={t("tools.shell")}
-      subtitle={description}
+      subtitle={subtitle}
       status={status}
       error={error}
+      defaultExpanded={status === "pending" || status === "running"}
     >
       {shellOutput ? (
         <ScrollView
@@ -346,7 +392,7 @@ function BashToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function GlobToolDisplay({ part }: { part: ToolPart }) {
+function GlobToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -372,7 +418,7 @@ function GlobToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function GrepToolDisplay({ part }: { part: ToolPart }) {
+function GrepToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -402,7 +448,7 @@ function GrepToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function TaskToolDisplay({ part }: { part: ToolPart }) {
+function TaskToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -422,7 +468,7 @@ function TaskToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function QuestionToolDisplay({ part }: { part: ToolPart }) {
+function QuestionToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const status = getToolStatus(part);
@@ -430,6 +476,9 @@ function QuestionToolDisplay({ part }: { part: ToolPart }) {
   const input = getInput(part);
   const metadata = getMetadata(part);
 
+  // NOTE: the interactive inline card was removed on purpose — pending
+  // forms are answered from the bottom FormBanner only. This card
+  // stays as the read-only record (question text + answers).
   const questions = (input.questions ?? []) as {
     question: string;
     header?: string;
@@ -450,6 +499,10 @@ function QuestionToolDisplay({ part }: { part: ToolPart }) {
     return t("tools.questionsCount", { n: count, s: count > 1 ? "s" : "" });
   })();
 
+  // Always expanded while waiting: the question text comes from the
+  // tool input (already in messages), so it is visible even before the
+  // question.* request arrives over SSE/poll. Without this the card is a
+  // bare "Questions · Busy" with no way to see what is asked.
   return (
     <ToolCard
       icon={<MessageCircleQuestion size={14} />}
@@ -457,9 +510,9 @@ function QuestionToolDisplay({ part }: { part: ToolPart }) {
       subtitle={subtitle}
       status={status}
       error={error}
-      defaultExpanded={completed}
+      defaultExpanded={true}
     >
-      {completed ? (
+      {questions.length > 0 ? (
         <View className="px-3 py-2 gap-2">
           {questions.map((q, i) => {
             const answer = answers[i] ?? [];
@@ -472,12 +525,21 @@ function QuestionToolDisplay({ part }: { part: ToolPart }) {
                 >
                   {q.question}
                 </Text>
-                <Text
-                  className="text-xs ml-2"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {answer.join(", ") || t("tools.noAnswer")}
-                </Text>
+                {completed ? (
+                  <Text
+                    className="text-xs ml-2"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    {answer.join(", ") || t("tools.noAnswer")}
+                  </Text>
+                ) : q.options && q.options.length > 0 ? (
+                  <Text
+                    className="text-xs ml-2"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    {q.options.map((o) => o.label).join(" / ")}
+                  </Text>
+                ) : null}
               </View>
             );
           })}
@@ -487,7 +549,7 @@ function QuestionToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function WebFetchToolDisplay({ part }: { part: ToolPart }) {
+function WebFetchToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -506,7 +568,7 @@ function WebFetchToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function SkillToolDisplay({ part }: { part: ToolPart }) {
+function SkillToolDisplay({ part }: { part: ChatToolPart }) {
   const { t } = useT();
   const input = getInput(part);
   const status = getToolStatus(part);
@@ -524,7 +586,7 @@ function SkillToolDisplay({ part }: { part: ToolPart }) {
   );
 }
 
-function TodoWriteToolDisplay({ part }: { part: ToolPart }) {
+function TodoWriteToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -603,7 +665,7 @@ function TodoWriteToolDisplay({ part }: { part: ToolPart }) {
 
 // -- Default fallback for unknown tools --
 
-function DefaultToolDisplay({ part }: { part: ToolPart }) {
+function DefaultToolDisplay({ part }: { part: ChatToolPart }) {
   const theme = useAppTheme();
   const { t } = useT();
   const input = getInput(part);
@@ -673,7 +735,7 @@ function DefaultToolDisplay({ part }: { part: ToolPart }) {
 
 const TOOL_RENDERERS: Record<
   string,
-  React.ComponentType<{ part: ToolPart }>
+  React.ComponentType<{ part: ChatToolPart }>
 > = {
   mcp_read: ReadToolDisplay,
   mcp_write: WriteToolDisplay,
@@ -703,12 +765,32 @@ const TOOL_RENDERERS: Record<
 
 export const ToolInvocation = memo(function ToolInvocation({
   part,
+  server,
+  pendingPermissions,
 }: ToolInvocationProps) {
+  const permissionRequest = findPermissionRequest(part, pendingPermissions);
+  const showPermissionInline =
+    !!permissionRequest &&
+    !!server &&
+    (part.state.status === "pending" || part.state.status === "running");
+  const isQuestionTool = part.tool === "question" || part.tool === "mcp_question";
+
   const Renderer = TOOL_RENDERERS[part.tool];
 
-  if (Renderer) {
+  if (isQuestionTool) {
+    if (!Renderer) {
+      return <DefaultToolDisplay part={part} />;
+    }
+
     return <Renderer part={part} />;
   }
 
-  return <DefaultToolDisplay part={part} />;
+  return (
+    <View className="w-full">
+      {Renderer ? <Renderer part={part} /> : <DefaultToolDisplay part={part} />}
+      {showPermissionInline && permissionRequest && server ? (
+        <PermissionInlineCard request={permissionRequest} server={server} />
+      ) : null}
+    </View>
+  );
 });

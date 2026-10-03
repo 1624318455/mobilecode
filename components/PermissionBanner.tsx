@@ -8,21 +8,25 @@ import {
   TextInput,
   View,
 } from "react-native";
-import type { PermissionRequest } from "@opencode-ai/sdk/v2";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import type { PermissionRequest } from "@opencode/client";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import { isAskStale } from "@/lib/staleAsk";
 import { useT } from "@/lib/i18n";
 import { Server } from "@/stores";
 
 interface PermissionBannerProps {
   request: PermissionRequest;
   server: Server;
+  directory?: string;
 }
 
 function getPermissionLabel(permission: string, t: (key: string) => string): string {
   switch (permission) {
     case "bash":
+    case "shell":
       return t("permission.bash");
     case "edit":
       return t("permission.edit");
@@ -45,24 +49,24 @@ function getPermissionIcon(permission: string, color: string) {
   return <Shield size={18} color={color} />;
 }
 
-export function PermissionBanner({ request, server }: PermissionBannerProps) {
+export function PermissionBanner({ request, server, directory }: PermissionBannerProps) {
   const theme = useAppTheme();
   const { t } = useT();
-  const queryClient = useQueryClient();
-  const [rejectMessage, setRejectMessage] = useState("");
+  const queryClient = useQueryClient();  const [rejectMessage, setRejectMessage] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
 
   const replyMutation = useMutation({
     mutationFn: async ({ reply, message }: { reply: "once" | "always" | "reject"; message?: string }) => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
         username: server.username,
         password: server.password,
       });
 
       return client.permission.reply({
+        sessionID: request.sessionID,
         requestID: request.id,
-        reply,
+        decision: reply,
         message,
       });
     },
@@ -99,34 +103,47 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
     replyMutation.mutate({ reply: "reject" });
   }
 
-  const patterns = request.patterns ?? [];
-  const metadata = request.metadata ?? {};
+  const patterns = request.resources ?? [];
+  const metadata = (request.metadata ?? {}) as Record<string, unknown>;
   const command = metadata.command as string | undefined;
+  const stale = isAskStale(
+    queryClient,
+    server.url,
+    request.sessionID,
+    request.source?.type === "tool" ? request.source.messageID : undefined,
+  );
 
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(200)}
       className="mx-4 mb-3 overflow-hidden"
       style={{
-        backgroundColor: theme.colors.tertiaryContainer,
-        borderRadius: 20,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
       }}
     >
       {/* Header */}
-      <View className="flex-row items-center gap-2 px-4 pt-3 pb-2">
-        {getPermissionIcon(request.permission, theme.colors.tertiary)}
-        <Text
-          className="text-sm font-semibold flex-1"
-          style={{ color: theme.colors.onTertiaryContainer }}
-        >
-          {getPermissionLabel(request.permission, t)}
-        </Text>
-      </View>
+        <View className="flex-row items-center gap-2 px-4 pt-3 pb-2">
+          {getPermissionIcon(request.action, theme.colors.tertiary)}
+          <Text
+            className="text-sm font-semibold flex-1"
+            style={{ color: theme.colors.onTertiaryContainer }}
+          >
+            {stale
+              ? t("permission.expired")
+              : getPermissionLabel(request.action, t)}
+          </Text>
+        </View>
 
       {/* Details */}
+      {!stale ? (
       <View className="px-4 pb-3">
         {command ? (
           <View
-            className="rounded-lg px-3 py-2 mb-2"
+            className="rounded-[28px] px-3 py-2 mb-2"
             style={{ backgroundColor: theme.colors.inverseSurface }}
           >
             <Text
@@ -144,7 +161,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
             {patterns.map((pattern, i) => (
               <Text
                 key={i}
-                className="text-xs font-mono rounded px-2 py-1"
+                className="text-xs font-mono rounded-[28px] px-2 py-1"
                 style={{
                   color: theme.colors.onTertiaryContainer,
                   backgroundColor: theme.colors.surfaceContainerLowest,
@@ -162,11 +179,10 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
           <TextInput
             value={rejectMessage}
             onChangeText={setRejectMessage}
-            placeholder={t("permission.feedbackPh")}
-            placeholderTextColor={theme.colors.onSurfaceVariant}
+            placeholder={t("permission.feedbackPh")}            placeholderTextColor={theme.colors.onSurfaceVariant}
             editable={!isPending}
             autoFocus
-            className="mb-2 px-3 py-2 rounded-lg text-sm"
+            className="mb-2 px-3 py-2 rounded-[28px] text-sm"
             style={{
               backgroundColor: theme.colors.surfaceContainerLowest,
               color: theme.colors.onSurface,
@@ -176,17 +192,32 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
           />
         ) : null}
       </View>
+      ) : null}
 
       {/* Actions */}
       <View className="flex-row justify-end gap-2 px-4 pb-3">
-        {isPending ? (
+        {stale ? (
+          <Pressable
+            onPress={handleRejectImmediately}
+            disabled={isPending}
+            className="px-3 py-2 rounded-[28px]"
+            style={{ backgroundColor: theme.colors.surfaceVariant }}
+          >
+            <Text
+              className="text-sm font-medium"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              {t("question.dismiss")}
+            </Text>
+          </Pressable>
+        ) : isPending ? (
           <ActivityIndicator size="small" color={theme.colors.tertiary} />
         ) : (
           <>
             <Pressable
               onPress={showRejectInput ? handleReject : handleRejectImmediately}
               disabled={isPending}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-[28px]"
               style={{ backgroundColor: theme.colors.errorContainer }}
             >
               <Text
@@ -200,7 +231,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
               <Pressable
                 onPress={() => setShowRejectInput(true)}
                 disabled={isPending}
-                className="px-3 py-2 rounded-lg"
+                className="px-3 py-2 rounded-[28px]"
                 style={{ backgroundColor: theme.colors.surfaceVariant }}
               >
                 <Text
@@ -214,7 +245,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
             <Pressable
               onPress={handleAlwaysAllow}
               disabled={isPending}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-[28px]"
               style={{ backgroundColor: theme.colors.tertiary }}
             >
               <Text
@@ -227,7 +258,7 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
             <Pressable
               onPress={handleAllow}
               disabled={isPending}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-[28px]"
               style={{ backgroundColor: theme.colors.primary }}
             >
               <Text
@@ -250,6 +281,6 @@ export function PermissionBanner({ request, server }: PermissionBannerProps) {
           {t("feedback.replyFailed")}
         </Text>
       )}
-    </View>
+    </Animated.View>
   );
 }

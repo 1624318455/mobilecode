@@ -1,22 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
 import { Server } from "@/stores";
 
-export function usePermissions(server: Server, sessionId: string) {
+export function usePermissions(
+  server: Server,
+  sessionId: string,
+  directory?: string,
+) {
   return useQuery({
     queryKey: ["server", server.url, "session", sessionId, "permissions"],
     queryFn: async () => {
-      const client = createClient({
+      const client = createV2Client({
         baseUrl: server.url,
         username: server.username,
         password: server.password,
       });
-      const result = await client.permission.list();
 
-      const all = result.data ?? [];
-
-      return all.filter((p) => p.sessionID === sessionId);
+      return client.permission.list({ sessionID: sessionId });
     },
     refetchInterval: 1500,
   });

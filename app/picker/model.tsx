@@ -6,6 +6,7 @@ import { List, RadioButton, Searchbar, Text } from "react-native-paper";
 
 import { ModelInfo } from "@/hooks/useModels";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { EmptyState } from "@/components/EmptyState";
 import { useT } from "@/lib/i18n";
 import { usePickerStore } from "@/stores/picker";
 
@@ -98,9 +99,11 @@ export default function ModelPickerModal() {
         );
       }}
       ListEmptyComponent={
-        <View style={{ padding: 24, alignItems: "center" }}>
-          <Text variant="bodyMedium">{t("pickers.noModels")}</Text>
-        </View>
+        <EmptyState
+          kind="models"
+          title={t("pickers.noModels")}
+          body={t("pickers.noModelsBody")}
+        />
       }
     />
   );

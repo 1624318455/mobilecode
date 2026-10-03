@@ -1,14 +1,17 @@
 import { router } from "expo-router";
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Link2, Plus } from "lucide-react-native";
 import { FlatList, Pressable, Text, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 
 import { DeviceRow } from "@/components/DeviceRow";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { EmptyState } from "@/components/EmptyState";
 import { SignatureEntrance } from "@/components/SignatureEntrance";
 import { useDeviceRecords } from "@/hooks/useDeviceRecords";
-import { DeviceRecord } from "@/lib/protocol";
 import { useT } from "@/lib/i18n";
+import { useNotifyColors } from "@/lib/notify";
+import { DeviceRecord } from "@/lib/protocol";
 import { Server, useAppStore } from "@/stores";
 
 interface DeviceRowHostProps {
@@ -16,6 +19,7 @@ interface DeviceRowHostProps {
   record: DeviceRecord;
   server: Server;
   checking: boolean;
+  animate: boolean;
   onCheckServer: (server: Server) => void;
 }
 
@@ -24,6 +28,7 @@ const DeviceRowHost = memo(function DeviceRowHost({
   record,
   server,
   checking,
+  animate,
   onCheckServer,
 }: DeviceRowHostProps) {
   const setLastServerId = useAppStore((s) => s.setLastServerId);
@@ -38,7 +43,7 @@ const DeviceRowHost = memo(function DeviceRowHost({
   }, [setLastServerId, server.id]);
 
   return (
-    <SignatureEntrance index={index}>
+    <SignatureEntrance index={index} animate={animate} speed={1.5}>
       <DeviceRow
         record={record}
         checking={checking}
@@ -52,9 +57,11 @@ const DeviceRowHost = memo(function DeviceRowHost({
 export default function ServersScreen() {
   const theme = useAppTheme();
   const { t } = useT();
+  const notify = useNotifyColors();
   const servers = useAppStore((s) => s.servers);
   const { records, checking, check } = useDeviceRecords(servers);
   const autoChecked = useRef<Set<string>>(new Set());
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     servers.forEach((server) => {
@@ -81,11 +88,12 @@ export default function ServersScreen() {
           record={item}
           server={server}
           checking={!!checking[item.id]}
+          animate={!scrolled}
           onCheckServer={check}
         />
       );
     },
-    [servers, checking, check],
+    [servers, checking, check, scrolled],
   );
 
   return (
@@ -96,16 +104,22 @@ export default function ServersScreen() {
       data={records}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
+      onScrollBeginDrag={() => setScrolled(true)}
       ListHeaderComponent={
         <View>
           {needsRepair.length > 0 && (
-            <View
-              className="rounded-2xl p-3 mb-4"
-              style={{ backgroundColor: theme.colors.tertiaryContainer }}
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              className="rounded-[28px] p-4 mb-4"
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderWidth: 1,
+                borderColor: theme.colors.outlineVariant,
+              }}
             >
               <Text
                 className="text-sm font-medium"
-                style={{ color: theme.colors.onTertiaryContainer }}
+                style={{ color: notify.onContainer }}
               >
                 {needsRepair.length === 1
                   ? t("servers.repairBannerOne", { n: 1 })
@@ -117,50 +131,51 @@ export default function ServersScreen() {
               >
                 <Text
                   className="font-semibold text-sm"
-                  style={{ color: theme.colors.onTertiaryContainer }}
+                  style={{ color: notify.onContainer }}
                 >
                   {t("servers.pairAgain")}
                 </Text>
               </Pressable>
-            </View>
+            </Animated.View>
           )}
-          <Pressable
-            onPress={() => router.push("/server/new")}
-            className="rounded-2xl p-4 flex-row items-center justify-center mb-3"
-            style={{ backgroundColor: theme.colors.primary }}
-          >
-            <Plus size={20} color={theme.colors.onPrimary} />
-            <Text
-              className="font-semibold ml-2"
-              style={{ color: theme.colors.onPrimary }}
+          <View className="flex-row gap-3 mb-4">
+            <Pressable
+              onPress={() => router.push("/server/new")}
+              className="flex-1 rounded-[28px] p-4 flex-row items-center justify-center"
+              style={{ backgroundColor: theme.colors.primary }}
             >
-              {t("servers.addServer")}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/server/pair")}
-            className="rounded-2xl p-4 flex-row items-center justify-center mb-4"
-            style={{ backgroundColor: theme.colors.surfaceVariant }}
-          >
-            <Link2 size={20} color={theme.colors.primary} />
-            <Text
-              className="font-semibold ml-2"
-              style={{ color: theme.colors.onSurfaceVariant }}
+              <Plus size={20} color={theme.colors.onPrimary} />
+              <Text
+                className="font-semibold ml-2"
+                style={{ color: theme.colors.onPrimary }}
+              >
+                {t("servers.addServer")}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push("/server/pair")}
+              className="flex-1 rounded-[28px] p-4 flex-row items-center justify-center"
+              style={{ backgroundColor: theme.colors.surfaceVariant }}
             >
-              {t("servers.pairComputer")}
-            </Text>
-          </Pressable>
+              <Link2 size={20} color={theme.colors.primary} />
+              <Text
+                className="font-semibold ml-2"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {t("servers.pairComputer")}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       }
       ListEmptyComponent={
-        <View className="items-center py-12">
-          <Text
-            className="text-center"
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            {t("servers.empty")}
-          </Text>
-        </View>
+        <EmptyState
+          kind="devices"
+          title={t("servers.emptyTitle")}
+          body={t("servers.emptyBody")}
+          actionLabel={t("servers.pairComputer")}
+          onAction={() => router.push("/server/pair")}
+        />
       }
     />
   );

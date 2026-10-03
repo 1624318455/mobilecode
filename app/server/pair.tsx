@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import * as Haptics from "expo-haptics";
 import { useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -75,7 +76,7 @@ export default function PairServerScreen() {
     let result = null;
 
     if (method === "qr") {
-      result = await pairWithQr(qrJson, customName, mode);
+      result = await pairWithQr(qrJson, customName, mode, provider);
     } else if (method === "link") {
       result = await pairWithLink(link, customName, mode, provider);
     } else {
@@ -86,6 +87,7 @@ export default function PairServerScreen() {
     }
 
     if (result) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     }
   };

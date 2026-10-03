@@ -76,7 +76,7 @@ The app currently requires a direct network connection to your OpenCode server, 
 | UI               | React Native + NativeWind (Tailwind) |
 | State            | Zustand + MMKV persistence         |
 | Data Fetching    | TanStack React Query               |
-| API Client       | `@opencode-ai/sdk`                 |
+| API Client       | `@opencode/client` (v2 `promise`)     |
 
 ## Contributing
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { createClient } from "@/lib/opencode-client";
+import { createV2Client } from "@/lib/v2client";
+import { isAuthError } from "@/lib/v2types";
 import { DeviceRecord, Reachability } from "@/lib/protocol";
 import { Server, useAppStore } from "@/stores";
 
@@ -40,27 +41,15 @@ export function useDeviceRecords(servers: Server[]) {
       let result: Reachability = "unreachable";
 
       try {
-        const client = createClient({
+        const client = createV2Client({
           baseUrl: server.url,
           username: server.username,
           password: server.password,
         });
-        const res = await client.session.list();
-
-        if (res.data && !res.error) {
-          result = "ok";
-        } else if (
-          res.error &&
-          JSON.stringify(res.error).includes("401")
-        ) {
-          result = "expired";
-        }
+        await client.session.list({ limit: 1 });
+        result = "ok";
       } catch (err) {
-        if (
-          err instanceof Error &&
-          (err.message.includes("401") ||
-            err.message.toLowerCase().includes("unauthorized"))
-        ) {
+        if (isAuthError(err)) {
           result = "expired";
         } else {
           result = "unreachable";

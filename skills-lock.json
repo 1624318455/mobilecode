@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skills": {
+    "animation-systems": {
+      "source": "mengto/skills",
+      "sourceType": "github",
+      "skillPath": "agent-skills/web-design/animation-systems/SKILL.md",
+      "computedHash": "3b1538b9b7d54531ed0d83745d7748347b0285be6146b50af74b92224301eb3f"
+    },
+    "app-ui-design": {
+      "source": "majiayu000/spellbook",
+      "sourceType": "github",
+      "skillPath": "skills/app-ui-design/SKILL.md",
+      "computedHash": "50d70ba214d76c60660c02ebcadb54b8e820c7dfbc9b68fb3f81c6695e5a266f"
+    },
+    "mobile-design-review": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-design-review/SKILL.md",
+      "computedHash": "833b0192dba980732a5a8e7933fb36fc123a330b60fdd1eb2bd215c1ef7861c4"
+    },
+    "mobile-design-system": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-design-system/SKILL.md",
+      "computedHash": "75039907839edb5446144cdf8b10913e78f2c8898da3a9dfad748ff484729960"
+    },
+    "mobile-redesign-app": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-redesign-app/SKILL.md",
+      "computedHash": "7a3f64c02f5644e95cc822473032cc8ba88300ec741fb356730290af4446a2c1"
+    },
+    "mobile-redesign-screen": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-redesign-screen/SKILL.md",
+      "computedHash": "c6e574a7607bed8fb7909f0345b497b2e5acbdc1aafc776930942e61e59ba46b"
+    },
+    "mobile-taste": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-taste/SKILL.md",
+      "computedHash": "ef44362f66b5736408c70f63c6ccdb1d2845bc15e458e0bc0cb9d03d990dd798"
+    },
+    "nielsen-usability-heuristics": {
+      "source": "dembrandt/dembrandt-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nielsen-usability-heuristics/SKILL.md",
+      "computedHash": "ecb1580cb9c72202b843b5b33ee495f677717208ba66ca9affd6e034f8552ecc"
+    }
+  }
+}

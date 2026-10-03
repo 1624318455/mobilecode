@@ -1,14 +1,15 @@
 import { router } from "expo-router";
 import { MoreVertical, RefreshCw } from "lucide-react-native";
-import { memo } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { memo, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
+import { DeviceMenuSheet } from "@/components/DeviceMenuSheet";
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { formatTimeAgo } from "@/lib/formatTimeAgo";
 import { useT } from "@/lib/i18n";
+import { useNotifyColors } from "@/lib/notify";
 import { DeviceRecord, Reachability } from "@/lib/protocol";
-import { clearSecureForServer } from "@/lib/secure";
-import { useAppStore } from "@/stores";
+import { useUnreadStore } from "@/stores/unread";
 
 const STATUS_LABELS = (t: (key: string) => string): Record<DeviceRecord["reachable"], string> => ({
   ok: t("device.reachable"),
@@ -33,66 +34,31 @@ export const DeviceRow = memo(function DeviceRow({
 }: DeviceRowProps) {
   const theme = useAppTheme();
   const { t } = useT();
-  const removeServer = useAppStore((s) => s.removeServer);
-  const server = useAppStore((s) => s.servers.find((x) => x.id === record.id));
+  const notify = useNotifyColors();
+  const [menuVisible, setMenuVisible] = useState(false);
+  const unreadCount = useUnreadStore(
+    (s) => Object.values(s.items).filter((e) => e.serverId === record.id).length,
+  );
+  const dotEnabled = useUnreadStore((s) => s.dotEnabled);
+  const showUnread = dotEnabled ? unreadCount : 0;
 
   const dotColor: Record<Reachability, string> = {
     ok: theme.colors.tertiary,
     checking: theme.colors.onSurfaceVariant,
     unreachable: theme.colors.onSurfaceVariant,
     revoked: theme.colors.onSurfaceVariant,
-    expired: theme.colors.tertiary,
-  };
-
-  const handleMenu = () => {
-    const labels = STATUS_LABELS(t);
-
-    Alert.alert(record.customName, `${record.origin}`, [
-      {
-        text: t("device.menuRepair"),
-        onPress: () => {
-          router.push("/server/pair");
-        },
-      },
-      {
-        text: t("device.menuCheck"),
-        onPress: () => {
-          onCheck();
-        },
-      },
-      {
-        text: t("device.menuDelete"),
-        style: "destructive",
-        onPress: () => {
-          Alert.alert(
-            t("device.delTitle"),
-            t("device.delMsg"),
-            [
-              { text: t("common.cancel"), style: "cancel" },
-              {
-                text: t("common.delete"),
-                style: "destructive",
-                onPress: () => {
-                  if (server?.deviceTokenRef) {
-                    clearSecureForServer(server.deviceTokenRef);
-                  }
-
-                  removeServer(record.id);
-                },
-              },
-            ],
-          );
-        },
-      },
-      { text: t("common.cancel"), style: "cancel" },
-    ]);
+    expired: notify.accent,
   };
 
   return (
     <Pressable
       onPress={onOpen}
-      className="rounded-2xl p-4 mb-3 active:opacity-80"
-      style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
+      className="rounded-[28px] p-4 mb-3 active:opacity-80"
+      style={{
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
+      }}
     >
       <View className="flex-row items-center">
         <View
@@ -138,8 +104,24 @@ export const DeviceRow = memo(function DeviceRow({
             <RefreshCw size={18} color={theme.colors.primary} />
           )}
         </Pressable>
+        {showUnread > 0 ? (
+          <View
+            className="min-w-6 h-6 rounded-full items-center justify-center px-1.5 mr-1"
+            style={{ backgroundColor: theme.colors.error }}
+            accessibilityLabel={t("notify.unreadCount", { n: showUnread })}
+          >
+            <Text
+              className="text-xs font-semibold"
+              style={{ color: theme.colors.onError }}
+            >
+              {showUnread > 99 ? "99+" : String(showUnread)}
+            </Text>
+          </View>
+        ) : null}
         <Pressable
-          onPress={handleMenu}
+          onPress={() => {
+            setMenuVisible(true);
+          }}
           className="p-2"
           accessibilityLabel={t("a11y.deviceMenu")}
           accessibilityRole="button"
@@ -147,18 +129,32 @@ export const DeviceRow = memo(function DeviceRow({
         >
           <MoreVertical size={18} color={theme.colors.onSurfaceVariant} />
         </Pressable>
+        {menuVisible ? (
+          <DeviceMenuSheet
+            visible
+            record={record}
+            onCheck={onCheck}
+            onClose={() => {
+              setMenuVisible(false);
+            }}
+          />
+        ) : null}
       </View>
       {(record.reachable === "expired" || record.reachable === "revoked") && (
         <Pressable
           onPress={() => {
             router.push("/server/pair");
           }}
-          className="mt-3 rounded-lg py-2 items-center"
-          style={{ backgroundColor: theme.colors.tertiaryContainer }}
+          className="mt-3 rounded-[28px] py-2 items-center"
+          style={{
+            backgroundColor: "#FFFFFF",
+            borderWidth: 1,
+            borderColor: theme.colors.outlineVariant,
+          }}
         >
           <Text
             className="font-medium text-sm"
-            style={{ color: theme.colors.onTertiaryContainer }}
+            style={{ color: notify.onContainer }}
           >
             {t("device.repairCta")}
           </Text>

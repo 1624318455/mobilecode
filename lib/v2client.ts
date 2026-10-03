@@ -1,13 +1,12 @@
-import { createOpencodeClient, OpencodeClient } from "@opencode-ai/sdk/v2";
+import { OpenCode } from "@opencode/client";
 
-interface CreateClientOptions {
+interface V2ClientOptions {
   baseUrl: string;
-  directory?: string;
   username?: string;
   password?: string;
 }
 
-export function createClient(options: CreateClientOptions): OpencodeClient {
+export function createV2Client(options: V2ClientOptions) {
   const headers: Record<string, string> = {};
 
   if (options.username || options.password) {
@@ -15,11 +14,10 @@ export function createClient(options: CreateClientOptions): OpencodeClient {
     headers["Authorization"] = `Basic ${btoa(credentials)}`;
   }
 
-  return createOpencodeClient({
+  return OpenCode.make({
     baseUrl: options.baseUrl.replace(/\/$/, ""),
-    directory: options.directory,
     headers,
   });
 }
 
-export type { OpencodeClient };
+export type V2Client = ReturnType<typeof OpenCode.make>;

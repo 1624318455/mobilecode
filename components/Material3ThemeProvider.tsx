@@ -36,7 +36,59 @@ export function Material3ThemeProvider({
       return { ...MD3DarkTheme, colors: theme.dark };
     }
 
-    return { ...MD3LightTheme, colors: theme.light };
+    // Coinbase full lock (light only; dark stays dynamic until arranged).
+    // Every role below comes from the Coinbase DESIGN.md or its neutral set;
+    // nothing is left to the wallpaper seed except dark mode.
+    return {
+      ...MD3LightTheme,
+      colors: {
+        ...theme.light,
+        primary: "#0052FF",
+        onPrimary: "#FFFFFF",
+        primaryContainer: "#DCE6FF",
+        onPrimaryContainer: "#002B8F",
+        secondary: "#5B616E",
+        onSecondary: "#FFFFFF",
+        secondaryContainer: "#EEF0F3",
+        onSecondaryContainer: "#0A0B0D",
+        tertiary: "#05B169",
+        onTertiary: "#FFFFFF",
+        tertiaryContainer: "#D9F2E4",
+        onTertiaryContainer: "#0A4D2E",
+        error: "#CF202F",
+        onError: "#FFFFFF",
+        errorContainer: "#FBE3E4",
+        onErrorContainer: "#8F1D22",
+        background: "#FFFFFF",
+        onBackground: "#0A0B0D",
+        surface: "#FFFFFF",
+        onSurface: "#0A0B0D",
+        surfaceVariant: "#EEF0F3",
+        onSurfaceVariant: "#5B616E",
+        surfaceDisabled: "#A8B8CC",
+        onSurfaceDisabled: "#FFFFFF",
+        surfaceContainerLowest: "#FFFFFF",
+        surfaceContainerLow: "#F7F9FF",
+        surfaceContainer: "#EFF4FF",
+        surfaceContainerHigh: "#E4ECFF",
+        surfaceContainerHighest: "#DCE6FF",
+        outline: "#7C828A",
+        outlineVariant: "#DEE1E6",
+        inverseSurface: "#0A0B0D",
+        inverseOnSurface: "#FFFFFF",
+        inversePrimary: "#4ADE80",
+        shadow: "#0A0B0D",
+        scrim: "#0A0B0D",
+        elevation: {
+          level0: "#FFFFFF",
+          level1: "#FFFFFF",
+          level2: "#FFFFFF",
+          level3: "#F7F9FF",
+          level4: "#EFF4FF",
+          level5: "#EFF4FF",
+        },
+      },
+    };
   }, [colorScheme, theme]);
 
   return (
