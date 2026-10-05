@@ -145,6 +145,12 @@ function RootLayoutNav() {
                   }}
                 />
                 <Stack.Screen
+                  name="server/[serverId]/project/[projectId]/session/[sessionId]/settings/index"
+                  options={{
+                    title: t("sessionSettings.title"),
+                  }}
+                />
+                <Stack.Screen
                   name="picker/agent"
                   options={{
                     presentation: "formSheet",
