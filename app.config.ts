@@ -29,7 +29,7 @@ const config: ExpoConfig = {
       backgroundColor: "#000000",
     },
     package: bundleIdentifier,
-    permissions: ["POST_NOTIFICATIONS"],
+    permissions: ["POST_NOTIFICATIONS", "android.permission.CAMERA"],
   },
   web: {
     bundler: "metro",

@@ -1,7 +1,9 @@
 import { router } from "expo-router";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import type { BarcodeScanningResult } from "expo-camera";
 import * as Haptics from "expo-haptics";
-import { useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Modal, ScrollView, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import {
   Button,
@@ -39,6 +41,10 @@ export default function PairServerScreen() {
   const [pairUser, setPairUser] = useState("");
   const [pairPass, setPairPass] = useState("");
   const [port, setPort] = useState("4096");
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const scannedRef = useRef(false);
   const servers = useAppStore((s) => s.servers);
   const lastSeenIp = useAppStore((s) => s.lastSeenIp);
 
@@ -72,8 +78,33 @@ export default function PairServerScreen() {
     reset();
   };
 
-  const handlePair = async () => {
-    let result = null;
+  const handleScanPress = async () => {
+    setScanError(null);
+
+    const res = cameraPermission?.granted
+      ? { granted: true as boolean }
+      : await requestCameraPermission();
+
+    if (res.granted) {
+      scannedRef.current = false;
+      setScanOpen(true);
+    } else {
+      setScanError(t("pair.cameraDenied"));
+    }
+  };
+
+  const handleBarcodeScanned = (result: BarcodeScanningResult) => {
+    if (scannedRef.current) {
+      return;
+    }
+
+    scannedRef.current = true;
+    setQrJson(result.data);
+    reset();
+    setScanOpen(false);
+  };
+
+  const handlePair = async () => {    let result = null;
 
     if (method === "qr") {
       result = await pairWithQr(qrJson, customName, mode, provider);
@@ -170,19 +201,63 @@ export default function PairServerScreen() {
           />
 
           {method === "qr" && (
-            <TextInput
-              label={t("pair.qrLabel")}
-              value={qrJson}
-              onChangeText={(t) => {
-                setQrJson(t);
-                reset();
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              multiline
-              numberOfLines={4}
-              style={{ marginBottom: 12 }}
-            />
+            <>
+              <Button
+                mode="outlined"
+                icon="qrcode-scan"
+                onPress={() => {
+                  void handleScanPress();
+                }}
+                style={{ marginBottom: 12 }}
+              >
+                {t("pair.scanQr")}
+              </Button>
+              {scanError && (
+                <HelperText type="error" visible={true}>
+                  {scanError}
+                </HelperText>
+              )}
+              <Modal
+                visible={scanOpen}
+                animationType="slide"
+                onRequestClose={() => setScanOpen(false)}
+              >
+                <View style={{ flex: 1 }}>
+                  <CameraView
+                    style={{ flex: 1 }}
+                    barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                    onBarcodeScanned={handleBarcodeScanned}
+                  />
+                  <Text
+                    variant="labelLarge"
+                    className="text-center"
+                    style={{ marginVertical: 12 }}
+                  >
+                    {t("pair.scanHint")}
+                  </Text>
+                  <Button
+                    mode="contained"
+                    onPress={() => setScanOpen(false)}
+                    style={{ marginHorizontal: 16, marginBottom: 32 }}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                </View>
+              </Modal>
+              <TextInput
+                label={t("pair.qrLabel")}
+                value={qrJson}
+                onChangeText={(t) => {
+                  setQrJson(t);
+                  reset();
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+                numberOfLines={4}
+                style={{ marginBottom: 12 }}
+              />
+            </>
           )}
 
           {method === "link" && (
