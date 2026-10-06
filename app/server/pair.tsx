@@ -3,17 +3,17 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import type { BarcodeScanningResult } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { useMemo, useRef, useState } from "react";
-import { Modal, ScrollView, View } from "react-native";
+import { Modal, Pressable, ScrollView, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import {
   Button,
   HelperText,
   List,
-  SegmentedButtons,
   Text,
   TextInput,
 } from "react-native-paper";
 
+import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useT } from "@/lib/i18n";
 import { useLanSweep } from "@/hooks/useLanSweep";
 import { usePairing } from "@/hooks/usePairing";
@@ -21,12 +21,19 @@ import { useAppStore } from "@/stores";
 
 type PairMethod = "qr" | "link" | "key";
 
+const METHOD_TABS: { value: PairMethod; labelKey: string }[] = [
+  { value: "qr", labelKey: "pair.mQr" },
+  { value: "link", labelKey: "pair.mLink" },
+  { value: "key", labelKey: "pair.mKey" },
+];
+
 // NOTE: remote connection modes (cloudflared / self-proxy) are not
 // implemented — every request goes straight to server.url (see usePairing).
 // Only LAN pairing is offered; the stored provider field stays for compat.
 
 export default function PairServerScreen() {
   const { t } = useT();
+  const theme = useAppTheme();
   const [method, setMethod] = useState<PairMethod>("link");
   const [customName, setCustomName] = useState("");
   const [qrJson, setQrJson] = useState("");
@@ -126,19 +133,54 @@ export default function PairServerScreen() {
           >
             {t("pair.method")}
           </Text>
-          <SegmentedButtons
-            value={method}
-            onValueChange={(v) => {
-              setMethod(v as PairMethod);
-              reset();
+          <View
+            className="flex-row"
+            style={{
+              backgroundColor: theme.colors.surfaceVariant,
+              borderRadius: 999,
+              padding: 4,
+              marginBottom: 12,
+              gap: 4,
             }}
-            buttons={[
-              { value: "qr", label: t("pair.mQr") },
-              { value: "link", label: t("pair.mLink") },
-              { value: "key", label: t("pair.mKey") },
-            ]}
-            style={{ marginBottom: 12 }}
-          />
+            accessibilityRole="tablist"
+          >
+            {METHOD_TABS.map((tab) => {
+              const active = method === tab.value;
+
+              return (
+                <Pressable
+                  key={tab.value}
+                  onPress={() => {
+                    setMethod(tab.value);
+                    reset();
+                  }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  style={{
+                    flex: 1,
+                    alignItems: "center",
+                    paddingVertical: 10,
+                    borderRadius: 999,
+                    backgroundColor: active
+                      ? theme.colors.primary
+                      : "transparent",
+                  }}
+                >
+                  <Text
+                    className="text-sm"
+                    style={{
+                      color: active
+                        ? theme.colors.onPrimary
+                        : theme.colors.onSurfaceVariant,
+                      fontWeight: active ? "700" : "400",
+                    }}
+                  >
+                    {t(tab.labelKey)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           <TextInput
             label={t("pair.deviceName")}
