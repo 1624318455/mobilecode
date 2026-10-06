@@ -907,9 +907,11 @@ export function SessionChatContent({
         queryKey: ["server", server.url],
       });
       Alert.alert(t("sessionBusy.forkFallbackTitle"), t("sessionBusy.forkFallbackMsg"));
-      router.push(
-        `/server/${server.id}/project/${projectId}/session/${newId}`,
-      );
+      router.push({
+        pathname:
+          "/server/[serverId]/project/[projectId]/session/[sessionId]",
+        params: { serverId: server.id, projectId, sessionId: newId },
+      });
     },
   });
 
@@ -1264,9 +1266,11 @@ export function SessionChatContent({
               </Pressable>
               <Pressable
                 onPress={() =>
-                  router.push(
-                    `/server/${server.id}/project/${projectId}/session/${sessionId}/settings`,
-                  )
+                  router.push({
+                    pathname:
+                      "/server/[serverId]/project/[projectId]/session/[sessionId]/settings",
+                    params: { serverId: server.id, projectId, sessionId },
+                  })
                 }
                 className="p-2"
                 accessibilityLabel={t("a11y.sessionSettings")}

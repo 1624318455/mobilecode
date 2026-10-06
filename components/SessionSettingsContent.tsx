@@ -126,9 +126,11 @@ export function SessionSettingsContent({
       queryClient.invalidateQueries({
         queryKey: aggregateQueryKey(server.url),
       });
-      router.replace(
-        `/server/${server.id}/project/${projectId}/session/${fork.id}`,
-      );
+      router.replace({
+        pathname:
+          "/server/[serverId]/project/[projectId]/session/[sessionId]",
+        params: { serverId: server.id, projectId, sessionId: fork.id },
+      });
     },
   });
 
