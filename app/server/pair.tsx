@@ -16,23 +16,18 @@ import {
 
 import { useT } from "@/lib/i18n";
 import { useLanSweep } from "@/hooks/useLanSweep";
-import { PairMode, PairProvider, usePairing } from "@/hooks/usePairing";
+import { usePairing } from "@/hooks/usePairing";
 import { useAppStore } from "@/stores";
 
 type PairMethod = "qr" | "link" | "key";
 
-const PROVIDERS: { value: PairProvider; key: string }[] = [
-  { value: "lan", key: "pair.pLan" },
-  { value: "cloudflared-quick", key: "pair.pQuick" },
-  { value: "cloudflared-named", key: "pair.pNamed" },
-  { value: "self-proxy", key: "pair.pProxy" },
-];
+// NOTE: remote connection modes (cloudflared / self-proxy) are not
+// implemented — every request goes straight to server.url (see usePairing).
+// Only LAN pairing is offered; the stored provider field stays for compat.
 
 export default function PairServerScreen() {
   const { t } = useT();
   const [method, setMethod] = useState<PairMethod>("link");
-  const [mode, setMode] = useState<PairMode>("lan");
-  const [provider, setProvider] = useState<PairProvider>("lan");
   const [customName, setCustomName] = useState("");
   const [qrJson, setQrJson] = useState("");
   const [link, setLink] = useState("");
@@ -65,19 +60,6 @@ export default function PairServerScreen() {
     return new Set(servers.map((s) => s.url));
   }, [servers]);
 
-  const handleModeChange = (value: string) => {
-    const next = value as PairMode;
-    setMode(next);
-
-    if (next === "lan") {
-      setProvider("lan");
-    } else if (provider === "lan") {
-      setProvider("cloudflared-quick");
-    }
-
-    reset();
-  };
-
   const handleScanPress = async () => {
     setScanError(null);
 
@@ -104,14 +86,15 @@ export default function PairServerScreen() {
     setScanOpen(false);
   };
 
-  const handlePair = async () => {    let result = null;
+  const handlePair = async () => {
+    let result = null;
 
     if (method === "qr") {
-      result = await pairWithQr(qrJson, customName, mode, provider);
+      result = await pairWithQr(qrJson, customName, "lan", "lan");
     } else if (method === "link") {
-      result = await pairWithLink(link, customName, mode, provider);
+      result = await pairWithLink(link, customName, "lan", "lan");
     } else {
-      result = await pairWithKey(origin, code, customName, mode, provider, {
+      result = await pairWithKey(origin, code, customName, "lan", "lan", {
         username: pairUser,
         password: pairPass,
       });
@@ -136,41 +119,6 @@ export default function PairServerScreen() {
           >
             {t("pair.title")}
           </Text>
-
-          <Text
-            variant="labelLarge"
-            className="mb-2"
-          >
-            {t("pair.connection")}
-          </Text>
-          <SegmentedButtons
-            value={mode}
-            onValueChange={handleModeChange}
-            buttons={[
-              { value: "lan", label: t("pair.lan") },
-              { value: "remote", label: t("pair.remote") },
-            ]}
-            style={{ marginBottom: 12 }}
-          />
-
-          {mode === "remote" && (
-            <>
-              <Text
-                variant="labelLarge"
-                className="mb-2"
-              >
-                {t("pair.provider")}
-              </Text>
-              <SegmentedButtons
-                value={provider}
-                onValueChange={(v) => setProvider(v as PairProvider)}
-                buttons={PROVIDERS.filter((p) => p.value !== "lan").map(
-                  (p) => ({ value: p.value, label: t(p.key) }),
-                )}
-                style={{ marginBottom: 12 }}
-              />
-            </>
-          )}
 
           <Text
             variant="labelLarge"
@@ -244,19 +192,11 @@ export default function PairServerScreen() {
                   </Button>
                 </View>
               </Modal>
-              <TextInput
-                label={t("pair.qrLabel")}
-                value={qrJson}
-                onChangeText={(t) => {
-                  setQrJson(t);
-                  reset();
-                }}
-                autoCapitalize="none"
-                autoCorrect={false}
-                multiline
-                numberOfLines={4}
-                style={{ marginBottom: 12 }}
-              />
+              {qrJson ? (
+                <HelperText type="info" visible={true}>
+                  {t("pair.scannedOk")}
+                </HelperText>
+              ) : null}
             </>
           )}
 
@@ -324,7 +264,7 @@ export default function PairServerScreen() {
             </View>
           )}
 
-          {mode === "lan" && (
+          {method === "key" && (
             <View style={{ marginBottom: 12 }}>
               <Text variant="labelLarge" className="mb-2">
                 {t("pair.findLan")}
@@ -390,7 +330,6 @@ export default function PairServerScreen() {
                     left={(props) => <List.Icon {...props} icon="server" />}
                     onPress={() => {
                       setOrigin(host.origin);
-                      setMethod("key");
                       reset();
                     }}
                   />
