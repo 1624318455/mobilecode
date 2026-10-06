@@ -95,9 +95,15 @@ export function RecentSessionsDrawer({
   const handleSelect = useCallback(
     (item: RecentSession) => {
       onClose();
-      router.push(
-        `/server/${item.serverId}/project/${item.projectId}/session/${item.sessionId}`,
-      );
+      router.push({
+        pathname:
+          "/server/[serverId]/project/[projectId]/session/[sessionId]",
+        params: {
+          serverId: item.serverId,
+          projectId: item.projectId,
+          sessionId: item.sessionId,
+        },
+      });
     },
     [onClose],
   );

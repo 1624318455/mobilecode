@@ -277,9 +277,15 @@ export function ServerContent({ server }: ServerContentProps) {
                     useUnreadStore
                       .getState()
                       .markSeen(entry.serverId, entry.sessionId);
-                    router.push(
-                      `/server/${entry.serverId}/project/${entry.projectId}/session/${entry.sessionId}`,
-                    );
+                    router.push({
+                      pathname:
+                        "/server/[serverId]/project/[projectId]/session/[sessionId]",
+                      params: {
+                        serverId: entry.serverId,
+                        projectId: entry.projectId,
+                        sessionId: entry.sessionId,
+                      },
+                    });
                   }}
                   className="py-2"
                   style={{

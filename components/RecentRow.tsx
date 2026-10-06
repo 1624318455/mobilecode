@@ -26,9 +26,15 @@ export const RecentRow = memo(function RecentRow({ item, index, animate = true, 
   );
 
   const handlePress = useCallback(() => {
-    router.push(
-      `/server/${item.serverId}/project/${item.projectId}/session/${item.sessionId}`,
-    );
+    router.push({
+      pathname:
+        "/server/[serverId]/project/[projectId]/session/[sessionId]",
+      params: {
+        serverId: item.serverId,
+        projectId: item.projectId,
+        sessionId: item.sessionId,
+      },
+    });
   }, [item.serverId, item.projectId, item.sessionId]);
 
   return (

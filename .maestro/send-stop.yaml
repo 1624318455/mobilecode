@@ -1,16 +1,29 @@
 appId: io.memeflyfly.mobilecode
 ---
+# send-stop 回归：忙时发送键变红 stop，点即中止；设置页兜底中止。
+#
+# 前置 staging（Mac 法，见 docs/e2e-runbook.md §10 睡眠配方；Windows 法见 §5）：
+# 建 allow-shell 会话 + 发 sleep 90 prompt，等服务端 /api/session/active
+# 出现该会话后再跑本 flow。会话标题经环境变量传入：
+#   maestro test -e SESSION_TITLE=send-stop-e2e .maestro/send-stop.yaml
+# 不传则用默认值（与 runbook 配方一致）。
+#
+# 注意：MIUI 上 maestro driver 装不上（INSTALL_FAILED_USER_RESTRICTED），
+# 本 flow 目前只在 Windows 机验证；Mac 用 adb harness 等效执行。
 - launchApp:
     stopApp: false
 - tapOn: "最近"
 - assertVisible: "最近"
-# 进第一个会话（标题含 移除busy条）
-- tapOn: "移除busy条.*"
-# 聊天页：输入区发送键（空闲态 content-desc=发送消息；忙碌态=中止）
-- assertVisible: "发送消息|中止"
-- takeScreenshot: chat_input
-# 右上角设置
+# 进目标会话（标题正则全字串匹配，stale/聚合延迟时先等再下拉刷）
+- tapOn: "${SESSION_TITLE:-send-stop-e2e}"
+# 忙态：输入区按键 content-desc 应为“中止”（红 stop），而不是“发送消息”
+- assertVisible: "中止"
+# 无 busy/retry 横条残留：聊天页不应出现历史 busy 条文案
+- takeScreenshot: chat_busy_stop
+# 右上角设置页：fork/compact 常驻
 - tapOn: "会话设置"
 - assertVisible: "分支继续"
 - assertVisible: "压缩历史"
-- takeScreenshot: chat_settings
+# 忙时设置页应有兜底中止（idle 时无此按钮，staging 决定断言）
+- assertVisible: "中止"
+- takeScreenshot: chat_settings_abort

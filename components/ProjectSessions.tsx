@@ -60,9 +60,15 @@ export function ProjectSessions({ project, server, expanded = true }: ProjectSes
         queryKey: aggregateQueryKey(server.url),
       });
       if (session) {
-        router.push(
-          `/server/${serverId}/project/${project.id}/session/${session.id}`,
-        );
+        router.push({
+          pathname:
+            "/server/[serverId]/project/[projectId]/session/[sessionId]",
+          params: {
+            serverId,
+            projectId: project.id,
+            sessionId: session.id,
+          },
+        });
       }
     },
   });
@@ -119,9 +125,15 @@ export function ProjectSessions({ project, server, expanded = true }: ProjectSes
           title={session.title}
           updatedAt={session.updatedAt}
           onPress={() =>
-            router.push(
-              `/server/${serverId}/project/${project.id}/session/${session.id}`,
-            )
+            router.push({
+              pathname:
+                "/server/[serverId]/project/[projectId]/session/[sessionId]",
+              params: {
+                serverId,
+                projectId: project.id,
+                sessionId: session.id,
+              },
+            })
           }
         />
       ))}

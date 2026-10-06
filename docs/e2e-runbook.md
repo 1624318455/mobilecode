@@ -209,3 +209,64 @@ const form = await client.session.form.create({
   10s 轮询的 reply watcher 在后台根本跑不起来。修要把轮询搬进原生
   `AliveService`（要凭据/会话跟踪/deep-link，量级大且 MIUI 仍可能杀），
   本轮不做，保持 10-01 结论。
+
+## 10. 2026-10-05/06 Mac 真机实测补充（send-stop + 设置路由，build `20261005-objpush`）
+
+本节命令全部在 macOS 下验证过，与 Windows 章节逐条对应，IP/密码以本机为准。
+
+### 环境差异
+
+| 项 | Mac 实测值 |
+|---|---|
+| 手机 | 同一台 REDMI（`adb-ce0d7044-d9jp67._adb-tls-connect._tcp`，IP 仍常变） |
+| 配对 | Mac 下管道喂码可用：`echo "六位码" \| adb pair IP:配对端口`（Windows 才需文件重定向） |
+| opencode serve | 本机常驻 `--service`，端口动态（实测 `49374`，`lsof -iTCP -sTCP:LISTEN` 查），密码见 `~/.config/opencode/service.json` |
+| App↔服务 | `adb reverse tcp:4096 tcp:49374`（手机侧 `http://127.0.0.1:4096` 不变，直通 Mac 服务；`reverse --list` 为空就重打，掉线/重启必掉） |
+| 终端代理 | xray 在 `127.0.0.1:10808`（HTTP 与 SOCKS5 均通），写入 `~/.zshrc` 常驻；注意该代理回源 `dl.google.com` 全是假 404，只能走国内镜像 |
+| bun | 原机没有，`curl -fsSL https://bun.sh/install \| bash`（走代理），再 `bun install` |
+| maestro CLI | `brew install maestro` 只给 Studio（Electron 壳）；真 CLI 从 GitHub release 取：`maestro.zip`（`cli-2.11.0`，`~/.maestro/maestro/bin/maestro`）。**MIUI 上跑不起来**：driver 安装被 `INSTALL_FAILED_USER_RESTRICTED` 拦且无弹窗，本轮改用 adb+uiautomator+截图 harness（见下），flow 文件仅留作 Windows 机用 |
+
+### 构建（Mac 从零编 release，巨坑，逐个已踩平）
+
+1. `bun x expo run:android --variant release` 前必 export：`ANDROID_HOME=$HOME/Library/Android/sdk`（否则 `SDK location not found`）。
+2. NDK 27 下不下来（sdkmanager 连不上 google）：本机只有 NDK 28，`android/`（git-ignored，不入库）里改用 28——`android/gradle.properties` 加 `ndkVersion=28.2.13676358` **不够**（expo-root-project 的 `setIfNotExist` 和 AGP 默认只认先声明的 ext），必须在 `android/build.gradle` **顶部**（`apply plugin: "expo-root-project"` 之前）写死 `ext.ndkVersion = "28.2.13676358"`，另在 `~/.gradle/init.gradle`（Groovy，KTS 里写不了动态类型）里给所有 `com.android.application/library` 模块强制 `ndkVersion`（AGP 8.5 默认 27，不装就 `NDK not configured`）。
+3. 依赖下载：`~/.gradle/init.gradle.kts` 里 settings 层换国内镜像（aliyun google/central 在前，tencent 在后）**不够**——included build（expo-gradle-plugin）和自带 `repositories { google() }` 的子模块（settings-plugin、keyboard-controller、mmkv、nitro 等）无视 settings。做法：同样在 init 里 `allprojects` 前置镜像，仍有漏网就直改对应 `build.gradle(.kts)` 的 `repositories` 块（node_modules 改动不入库，`bun install` 会丢，重装依赖后重打）。
+4. `~/.gradle/gradle.properties` 加代理 systemProp + 超时放宽 + 内存：`org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g`（默认 512M Metaspace 会在 lintVital 阶段把 daemon OOM 杀掉，进程直接消失无报错）。
+5. `android/app/build.gradle` 的 `android { lint { checkReleaseBuilds false } }`（android/ 不入库）：跳过 release lint。
+6. 签名：Mac 编的包与 Windows 包签名不同，`INSTALL_FAILED_UPDATE_INCOMPATIBLE` 时 `adb uninstall io.memeflyfly.mobilecode`（清数据，服务器要重配，见下）。
+
+### 配对（App 数据被清后）
+
+配对屏切到`配对码`法，`input text` 逐个填（`input tap` 只管聚焦，`TAB(keyevent 61)` 切下一个框最稳；地址框若有残留先点尾部再按 `KEYCODE_DEL` 删——点中部会把光标放中间）：
+origin `http://127.0.0.1:4096`，code 任意填（OpenCode 不校验，只验用户/密码连通性），username `opencode`，password 取 Mac service.json。成功后设备行变`可达 • 上次连接刚刚`。
+
+### UI 定位法（无 maestro 时）
+
+- 首选 `adb shell uiautomator dump /sdcard/ui.xml` + pull 下来按 text/content-desc/bounds 精确定位（全屏正则，跑 Windows 版 trap #2 同理）。
+- **busy/流式屏 dump 必挂**（`could not get idle state`，打字点动画停不下来）：改用颜色分割——截屏后 ffmpeg 裁/缩成 raw，用 python 按“蓝底白字”（B>100 且 B-R>40 且 B-G>20 且 R<150）找最大连通域，就是 `允许` 类按钮。截图目测只做辅助，禁止目测定坐标。
+- 截图 PNG 即设备全分辨率（1200x2608），读图工具展示会缩小，按比例换算，不要臆测展示尺寸。
+- 权限/审批横幅点不中时先查服务端状态（`/api/session/active`、`/permission`、`/form`）再动手：多数“点不中”是 run 已结束导致布局已变，不是坐标错。
+
+### 睡眠 staging 配方（busy 窗口制造机）
+
+```sh
+PW=$(python3 -c "import json;print(json.load(open('$HOME/.config/opencode/service.json'))['password'])")
+H="Authorization: Basic $(echo -n "opencode:$PW" | base64)"
+S=$(curl -s -m 15 -X POST http://127.0.0.1:49374/api/session -H "$H" \
+  -H "Content-Type: application/json" --data-binary \
+  '{"location":{"directory":"/private/tmp/e2e-sendstop"},"title":"send-stop-e2e","model":{"providerID":"opencode","id":"muse-spark-1.3-contributor-free"},"permissions":[{"action":"shell","resource":"*","effect":"allow"}]}')
+ID=$(echo "$S" | python3 -c "import json,sys;print(json.load(sys.stdin)['data']['id'])")
+curl -s -m 60 -X POST http://127.0.0.1:49374/api/session/$ID/prompt -H "$H" \
+  -H "Content-Type: application/json" --data-binary \
+  '{"text":"Use the shell tool to run exactly this command: sleep 90. Wait for it to finish, then reply with exactly SLEEP90-DONE."}'
+```
+
+- 要点：`sleep 90`（太短来不及点，`sleep 600` 会被模型拒掉：“10-minute blocking sleep would stall this session”——模型原话）；permissions 用 allow 免审批；建完立刻进会话页等 busy（LLM 首轮 30~90s）。
+- 审批 staging：建会话时 permissions 用 `ask`，prompt 里让它调 shell；表单直接 `POST /api/session/{id}/form` 建（字段见 §9）。
+- **staging 完删会话**（`DELETE /api/session/{id}`）+ 删临时目录，保持服务端干净。
+
+### 本轮结论（20261005-objpush，截图留证于 `/tmp/opencode/*.png`，随包不入库）
+
+- 通过：忙时发送键变红 stop（空输入可点）→点即中断（active 清除 + `Tool execution interrupted` + 按键恢复）；设置页 idle/busy 都能进（模型/重命名/分支继续/压缩历史/删除常驻，busy 多一个带二次确认的中止）；中止确认框→中断生效→按钮消失；活审批允许→继续→回包；表单选 Thursday→是→提交→清空；fork 成功并落地新会话（含空会话被拒且报错上屏）；compact 落 `compaction` 标记；重命名保存生效；删除走确认框→服务端消失→路由退回；TTS 自动朗读播 ~2s（AudioTrack 日志）；配对/最近分组/诊断网关监听日志/build 号。
+- 真 bug 两枚（都已修，见 git log）：① 齿轮进设置页 404——根布局 Stack 漏注册 `settings/index`（`69c2b82`，后证为显式化，真正病根见②）；② **编码 projectId 必现 404**——项目页入口用合成 id（含 `%2F`）时聊天页能进（整段命中），但齿轮按解码值重拼 URL 就多出 `/`。齿轮/fork/rescue 三处改对象式 `pathname+params` push（`0b3cccf`），entry 侧（RecentRow/drawer/ProjectSessions/未读）暂不动——它们进聊天页今天是通的，动了反而有风险，列入下轮。
+- 未覆盖：rescue 卡（造不出加密 reasoning 失败）、quota retry 真事件、后台通知（历史判死结论不变）、maestro framework（MIUI 拦 driver）。
