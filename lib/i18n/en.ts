@@ -143,7 +143,7 @@ const en = {
     lanOnly: "LAN only",
     noneFound: "No OpenCode servers answered on port {port}.",
     saved: "saved",    cameraNote:
-      "On the computer run `opencode pair` and paste the printed link (or its QR). Links work once and expire in 5 minutes. The session token is stored in the device keychain and only ever sent to the exact saved origin.",
+      "On the computer run `opencode pair` and paste the printed link (or its QR). Links work once and expire in 5 minutes. Over an adb forward, generate the link with `--url` using a phone-reachable address (e.g. http://127.0.0.1:4096). The session token is stored in the device keychain and only ever sent to the exact saved origin.",
     badPort: "Please enter a valid port (1–65535)",
   },
   chat: {
@@ -288,7 +288,7 @@ const en = {
     httpsOnly: "Origin must be https",
     needCode: "Please enter the pairing code",
     needServerUrl: "Please enter a server URL",
-    noConnection: "Could not connect to server",
+    noConnection: "Could not reach the server — check the address/port is reachable from the phone",
     failed: "Connection failed",
     pairingFailed: "Pairing failed",
     no24: "Cannot derive /24 from address {ip}",

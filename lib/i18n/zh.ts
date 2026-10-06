@@ -145,7 +145,7 @@ const zh: Dict = {
     noneFound: "在端口 {port} 上没有发现 OpenCode 服务器。",
     saved: "已保存",
     cameraNote:
-      "在电脑上运行 `opencode pair`，粘贴打印出的链接（或其二维码）。链接一次有效，5 分钟过期。会话令牌存放在系统钥匙串，且只会发往已保存的精确地址。",
+      "在电脑上运行 `opencode pair`，粘贴打印出的链接（或其二维码）。链接一次有效，5 分钟过期。经 adb 跳转时配对链接要加 `--url` 用手机可达的地址（如 http://127.0.0.1:4096）。会话令牌存放在系统钥匙串，且只会发往已保存的精确地址。",
     badPort: "请输入有效端口（1–65535）",
   },
   chat: {
@@ -289,7 +289,7 @@ const zh: Dict = {
     httpsOnly: "地址必须以 https 开头",
     needCode: "请输入配对码",
     needServerUrl: "请输入服务器地址",
-    noConnection: "无法连接到服务器",
+    noConnection: "无法连接到服务器——检查地址/端口手机是否可达（同一 WiFi，reverse 是否还在）",
     failed: "连接失败",
     pairingFailed: "配对失败",
     no24: "无法从地址 {ip} 推导 /24 网段",

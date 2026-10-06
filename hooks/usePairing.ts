@@ -13,6 +13,14 @@ export type PairProvider = RemoteProvider | "lan";
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 function translateError(message: string, t: TFn): string {
+  if (
+    /fetch failed|ConnectException|Network request failed|Load failed|timed out|timedout|ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|EAI_AGAIN|NetworkError/i.test(
+      message,
+    )
+  ) {
+    return t("errors.noConnection");
+  }
+
   switch (message) {
     case "Unsupported protocol version":
       return t("errors.badVersion");
