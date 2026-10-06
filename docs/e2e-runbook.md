@@ -311,3 +311,17 @@ Q1/Q2 已随上轮验证；本轮跑 Q3（失败反馈链）＋Q6（MCP 联通�
 - 从本机 opencode 二进制抽出 `pair` 实现：`server.pair()` 取一次性 code → 对每个服务地址拼 `new URL('/auth/connect/'+code, origin)` → 打印链接＋同一字符串的二维码。**官方 QR 内容 == 链接本身**，没有第二种格式。
 - 用户真机扫码已证明我方解析链走通：扫后直接尝试赎回并报出链接里的 origin（`ConnectException ... 127.0.0.1:49374`），失败点在该 origin 手机不可达（`pair` 默认打的服务端口），不在格式。
 - 结论：不需要等官方适配，也不需要我方加格式分支；要做的是 origin 不可达时的人话报错（已做：`translateError` 网络映射＋cameraNote 的 `--url` 指引）。
+
+## 12. 2026-10-06 远程（非局域网）方案：dsh-mobile 分析＋本机验证
+
+### dsh-mobile 怎么做（saya-ch/dsh-mobile，读了源码＋文档）
+
+两层，隧道只管可达、配对认证照走：
+- **服务端插件**：tailscale / cpolar / cloudflared（快隧随机域名 vs 命名稳定域名）/ 自建 frp+VPS+Caddy / 直连，5 选 1 单活（coordinator 强制单 provider，带回滚）。公网入口 → 加密隧道 → 本地网关。
+- **App 侧三条硬规矩**：① 按模式验域名（LAN 模式拒绝远程长相地址，REMOTE 模式只认公网 IP/隧道后缀/合法公网域名，IANA 保留段全排除）；② 凭据绑定精确 origin，换地址重配；③ 公网入口必 TLS（Caddy/Cloudflare 卸掉），HTTP 不上公网。另有配对窗口限时、一次性码、token 0600、SSH host key 当面核验。
+
+### 本机已验证（20261006-pairtabs  binary，WiFi 直连，不走 reverse）
+
+- `opencode serve --hostname 0.0.0.0 --port 4097` 起备服，手机配对码法配 `http://192.168.5.3:4097`（WiFi 通路）：建会话→prompt→红点→transcript 渲染 `WIFI-OK` 全通。
+- 插曲：曾连续三次打开一个空会话（别人建的）误判为消息渲染 bug；核对 `message?limit` 服务端有数＋换有标题行进入即现形。教训：空态先核对会话 id 和服务端消息数。
+- cloudflared 二进制今晚下不下来（proxy 断流、brew 挂），隧道那一跳没实测——但按 dsh 架构，App 分不清隧道和局域网（只认 origin 形状），传输层验证已覆盖。
