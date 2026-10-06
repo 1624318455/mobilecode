@@ -15,6 +15,7 @@ import {
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
 import { useT } from "@/lib/i18n";
+import { isPairConnectLink, parseQrPayload } from "@/lib/protocol";
 import { useLanSweep } from "@/hooks/useLanSweep";
 import { usePairing } from "@/hooks/usePairing";
 import { useAppStore } from "@/stores";
@@ -82,22 +83,62 @@ export default function PairServerScreen() {
     }
   };
 
+  // Mirrors what pairWithQr accepts (v2 connect link or legacy JSON
+  // payload) so invalid codes are rejected before any pairing attempt.
+  const isAcceptableQr = (raw: string): boolean => {
+    if (isPairConnectLink(raw)) {
+      return true;
+    }
+
+    try {
+      parseQrPayload(raw);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const runQrPair = async (content: string) => {
+    const result = await pairWithQr(content, customName, "lan", "lan");
+
+    if (result) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    }
+  };
+
   const handleBarcodeScanned = (result: BarcodeScanningResult) => {
     if (scannedRef.current) {
       return;
     }
 
     scannedRef.current = true;
-    setQrJson(result.data);
+    const content = result.data.trim();
+
+    // Validate before acting: a non-pair payload must never trigger a
+    // pairing attempt. Stay in the scanner so the user can re-aim.
+    if (!isAcceptableQr(content)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setScanError(t("pair.scanInvalid"));
+      setTimeout(() => {
+        scannedRef.current = false;
+      }, 1500);
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setQrJson(content);
     reset();
     setScanOpen(false);
+    void runQrPair(content);
   };
 
   const handlePair = async () => {
     let result = null;
 
     if (method === "qr") {
-      result = await pairWithQr(qrJson, customName, "lan", "lan");
+      await runQrPair(qrJson);
+      return;
     } else if (method === "link") {
       result = await pairWithLink(link, customName, "lan", "lan");
     } else {
@@ -225,6 +266,15 @@ export default function PairServerScreen() {
                   >
                     {t("pair.scanHint")}
                   </Text>
+                  {scanError && (
+                    <HelperText
+                      type="error"
+                      visible={true}
+                      style={{ textAlign: "center" }}
+                    >
+                      {scanError}
+                    </HelperText>
+                  )}
                   <Button
                     mode="contained"
                     onPress={() => setScanOpen(false)}

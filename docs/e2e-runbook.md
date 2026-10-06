@@ -270,3 +270,38 @@ curl -s -m 60 -X POST http://127.0.0.1:49374/api/session/$ID/prompt -H "$H" \
 - 通过：忙时发送键变红 stop（空输入可点）→点即中断（active 清除 + `Tool execution interrupted` + 按键恢复）；设置页 idle/busy 都能进（模型/重命名/分支继续/压缩历史/删除常驻，busy 多一个带二次确认的中止）；中止确认框→中断生效→按钮消失；活审批允许→继续→回包；表单选 Thursday→是→提交→清空；fork 成功并落地新会话（含空会话被拒且报错上屏）；compact 落 `compaction` 标记；重命名保存生效；删除走确认框→服务端消失→路由退回；TTS 自动朗读播 ~2s（AudioTrack 日志）；配对/最近分组/诊断网关监听日志/build 号。
 - 真 bug 两枚（都已修，见 git log）：① 齿轮进设置页 404——根布局 Stack 漏注册 `settings/index`（`69c2b82`，后证为显式化，真正病根见②）；② **编码 projectId 必现 404**——项目页入口用合成 id（含 `%2F`）时聊天页能进（整段命中），但齿轮按解码值重拼 URL 就多出 `/`。齿轮/fork/rescue 三处改对象式 `pathname+params` push（`0b3cccf`），entry 侧（RecentRow/drawer/ProjectSessions/未读）暂不动——它们进聊天页今天是通的，动了反而有风险，列入下轮。
 - 未覆盖：rescue 卡（造不出加密 reasoning 失败）、quota retry 真事件、后台通知（历史判死结论不变）、maestro framework（MIUI 拦 driver）。
+
+## 11. 2026-10-06 二维码扫码配对（真机问题驱动 + 行业调研）
+
+### 背景
+
+`opencode pair` 既打链接又打二维码，但 App 的“二维码”法只是一个粘贴框——用户实测反馈两条：
+1. 扫码成功失败都没有任何提示；
+2. 扫完（疑似成功）直接回配对页，无事发生：不配对、不跳转、无记录。
+
+### 调研结论（NN/g、uxpatternsguide、WhatsApp/Expo Go 设备流）
+
+- 状态必须用**文字**宣布，不能只靠动画/震动：scanning → decoded → validating → pairing → success/fail，每步可见。
+- 解码成功≠任务成功：扫码只是漏斗第一步，要度量到任务完成（配对成功/失败），不能停在“扫到了”。
+- 解码载荷先**校验**再动作：非配对内容、过期/已用链接要有具体可操作的报错（“不是配对码”“链接过期，重打一个”），不能是通用失败或沉默。
+- 扫码这种用户明确点“扫描”发起的**配对**动作，业界标准是自动继续（WhatsApp 关联设备、Expo Go、RFC 8628 设备流都是扫完自动走，附带进度），而不是扫完让人再找按钮——静默回表单是明确的反模式。
+- 相机拒绝要有退路（切链接/配对码），扫码框内允许重扫（invalid 不关框）。
+
+### 落码（`e972423` 之后）
+
+- `handleBarcodeScanned` 先用 `isPairConnectLink` + `parseQrPayload` 复刻 `pairWithQr` 的接受集做门禁：非法内容→错误震动＋框内红字（`pair.scanInvalid`）＋1.5s 后放行重扫，不关框；
+- 合法→成功震动→关框→`scannedOk` 预览→**自动调起配对**（loading 落在配对按钮上），成功进设备页，过期/已用走既有 `translateError`（`linkUsed` 等）红字；
+- 扫码成功/配对失败都有文字状态，相机拒绝指向链接/配对码 tab。
+
+### 测试场景（本轮可跑 vs 需人手）
+
+| # | 场景 | 方式 | 断言 |
+|---|---|---|---|
+| Q1 | 二维码 tab 只有扫码入口（无粘贴框） | 真机截图 | 有扫描按钮，无输入框 |
+| Q2 | 拒绝相机权限 | 真机点拒绝 | 红字提示切链接/配对码 |
+| Q3 | 过期/已用链接配对失败 | 真机：链接 tab 粘**已用过**的一次性链接→配对 | `linkUsed` 红字（链接过期或已用） |
+| Q4 | 非法内容扫码 | 代码走读＋门禁逻辑与 `pairWithQr` 同函数 | 非法不触发配对、不关框（光学步需人手） |
+| Q5 | 合法扫码自动配对 | 人手 10 秒：`opencode pair` 终端码→App 扫 | 自动进设备页，可达 |
+| Q6 | maestro MCP 联通 | 本机 `list_devices` | 工具可调（MIUI 真机仍被拦，见 §10） |
+
+Q1/Q2 已随上轮验证；本轮跑 Q3（失败反馈链）＋Q6（MCP 联通）。
