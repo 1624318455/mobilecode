@@ -325,3 +325,18 @@ Q1/Q2 已随上轮验证；本轮跑 Q3（失败反馈链）＋Q6（MCP 联通�
 - `opencode serve --hostname 0.0.0.0 --port 4097` 起备服，手机配对码法配 `http://192.168.5.3:4097`（WiFi 通路）：建会话→prompt→红点→transcript 渲染 `WIFI-OK` 全通。
 - 插曲：曾连续三次打开一个空会话（别人建的）误判为消息渲染 bug；核对 `message?limit` 服务端有数＋换有标题行进入即现形。教训：空态先核对会话 id 和服务端消息数。
 - cloudflared 二进制今晚下不下来（proxy 断流、brew 挂），隧道那一跳没实测——但按 dsh 架构，App 分不清隧道和局域网（只认 origin 形状），传输层验证已覆盖。
+
+### Tailscale 出门方案（Phase 0，已验证传输层等价路径）
+
+结论先行：App 侧不需要改——它只认 origin 形状。打通三步：
+
+1. 两端装 Tailscale 并登录**同一账号**（Mac 官方 pkg，手机应用商店；本机今晚下不动安装包，请手动装）。
+2. Mac 起对 tailnet 可见的服务（常驻 `--service` 只绑 localhost，不行）：
+   `opencode serve --hostname 0.0.0.0 --port 4097`，记下打印的密码。
+   `tailscale ip -4` 拿到本机 100.x 地址。
+3. 手机（任意网络，只要也在 tailnet 里）：配对码法配 `http://100.x:4097`，
+   或 `opencode pair --url http://100.x:4097` 后扫码。
+
+- 已验证的等价路径：同机 WiFi 下 `http://192.168.5.3:4097` 配对→prompt→红点→渲染全通（20261006-pairtabs binary）；Tailscale 只是把 underlay 从 WiFi 换成 WireGuard 加密网，App 走的代码路径完全一致。
+- 安全：tailnet 自带 WireGuard 加密，所以 HTTP origin 可接受（对标 dsh 的加密 overlay 立场）；不要把 0.0.0.0 的 serve 暴露在不可信局域网，配完即关或改绑指定 IP。
+- 已知限制：serve 密码随进程重建（重启服务要重配）；国内 Tailscale 直连质量看运营商，实在不行再谈自建 DERP/换 cloudflared（Phase 2）。
