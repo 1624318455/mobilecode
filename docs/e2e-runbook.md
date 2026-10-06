@@ -305,3 +305,9 @@ curl -s -m 60 -X POST http://127.0.0.1:49374/api/session/$ID/prompt -H "$H" \
 | Q6 | maestro MCP 联通 | 本机 `list_devices` | 工具可调（MIUI 真机仍被拦，见 §10） |
 
 Q1/Q2 已随上轮验证；本轮跑 Q3（失败反馈链）＋Q6（MCP 联通）。
+
+### 官方 QR 格式结论（2026-10-06，已实证，无需格式适配）
+
+- 从本机 opencode 二进制抽出 `pair` 实现：`server.pair()` 取一次性 code → 对每个服务地址拼 `new URL('/auth/connect/'+code, origin)` → 打印链接＋同一字符串的二维码。**官方 QR 内容 == 链接本身**，没有第二种格式。
+- 用户真机扫码已证明我方解析链走通：扫后直接尝试赎回并报出链接里的 origin（`ConnectException ... 127.0.0.1:49374`），失败点在该 origin 手机不可达（`pair` 默认打的服务端口），不在格式。
+- 结论：不需要等官方适配，也不需要我方加格式分支；要做的是 origin 不可达时的人话报错（已做：`translateError` 网络映射＋cameraNote 的 `--url` 指引）。
