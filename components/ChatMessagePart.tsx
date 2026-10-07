@@ -167,8 +167,16 @@ export const ChatMessagePart = memo(function ChatMessagePart({
       return bubble;
     }
 
+    // Always yield the responder to a nested scroller: without this, the
+    // Pressable can keep swallowing horizontal moves (notably table/code
+    // ScrollViews), making them unscrollable while taps/long-press still
+    // work. Yielding is safe — long-press fires on its timer regardless.
     return (
-      <Pressable onLongPress={handleLongPress} delayLongPress={350}>
+      <Pressable
+        onLongPress={handleLongPress}
+        delayLongPress={800}
+        onResponderTerminationRequest={() => true}
+      >
         {bubble}
       </Pressable>
     );

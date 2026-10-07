@@ -3,6 +3,7 @@ import { Dict } from "./en";
 const ja: Dict = {
   common: {
     cancel: "キャンセル",
+    close: "閉じる",
     delete: "削除",
     retry: "再試行",
     ok: "OK",
@@ -229,6 +230,10 @@ const ja: Dict = {
     shareFailed: "共有に失敗しました",
     speechFailed: "読み上げに失敗しました",
     done: "完了",
+  },
+  table: {
+    title: "テーブル",
+    fullscreen: "全画面で見る",
   },
   permission: {
     bash: "コマンドを実行",

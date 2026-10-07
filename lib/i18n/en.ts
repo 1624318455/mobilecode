@@ -1,6 +1,7 @@
 const en = {
   common: {
     cancel: "Cancel",
+    close: "Close",
     delete: "Delete",
     retry: "Retry",
     ok: "OK",
@@ -227,6 +228,10 @@ const en = {
     shareFailed: "Share failed",
     speechFailed: "Speech failed",
     done: "Done",
+  },
+  table: {
+    title: "Table",
+    fullscreen: "View table fullscreen",
   },
   permission: {
     bash: "Run command",

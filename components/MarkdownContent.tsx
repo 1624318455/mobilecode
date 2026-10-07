@@ -1,20 +1,30 @@
 import * as Clipboard from "expo-clipboard";
+import {
+  EncodingType,
+  cacheDirectory,
+  writeAsStringAsync,
+} from "expo-file-system/legacy";
+import { Check, Copy, Download, Maximize2, X } from "lucide-react-native";
 import MarkdownIt from "markdown-it";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleProp,
   Text,
   View,
   ViewStyle,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Markdown from "react-native-markdown-display";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
+import { extractTableData, tableToTsv } from "@/lib/markdownTables";
 import { useT } from "@/lib/i18n";
 
 const baseFontSize = 15;
@@ -315,7 +325,14 @@ function CodeBlock({
           </Text>
         </Pressable>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        directionalLockEnabled
+        showsHorizontalScrollIndicator
+        persistentScrollbar
+        scrollEventThrottle={16}
+      >
         <Text
           style={{
             fontFamily: monoFont,
@@ -327,6 +344,182 @@ function CodeBlock({
           {content}
         </Text>
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Deterministic horizontal drag-to-scroll for tables.
+ *
+ * A bare nested ScrollView loses the gesture race too often (vertical
+ * parent list + long-press bubble + MIUI touch filtering): swipes only
+ * sometimes take, and overlay paging buttons occlude content. This wrapper
+ * claims the responder exactly when the move is horizontally dominant and
+ * then drives the inner ScrollView itself, so every qualifying drag moves
+ * the table. Taps, vertical scrolls and the long-press menu are untouched:
+ * the wrapper never claims those.
+ */
+/**
+ * DeepSeek-style table card: header (title + copy/download/fullscreen),
+ * horizontally scrollable body without a scrollbar, and a fullscreen
+ * viewer. Copy/download share TSV derived from the table AST (pure
+ * functions, no render-phase side effects — a counter-based source
+ * matcher poisoned React Compiler reconciliation and dropped body rows).
+ */
+
+function TableCard({
+  node,
+  children,
+}: {
+  node: any;
+  children: React.ReactNode;
+}) {
+  const theme = useAppTheme();
+  const { t } = useT();
+  const [fullOpen, setFullOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const rows = useMemo(() => extractTableData(node), [node]);
+  const hasData = rows.some((r) => r.some((c) => c !== ""));
+
+  const handleCopy = async () => {
+    const tsv = tableToTsv(rows);
+
+    if (!tsv.trim()) {
+      return;
+    }
+
+    await Clipboard.setStringAsync(tsv);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+
+  const handleDownload = async () => {
+    const tsv = tableToTsv(rows);
+
+    if (!tsv.trim() || !cacheDirectory) {
+      return;
+    }
+
+    const uri = `${cacheDirectory}table-${Date.now()}.tsv`;
+    await writeAsStringAsync(uri, tsv, { encoding: EncodingType.UTF8 });
+    await Share.share({ url: uri });
+  };
+
+  const iconColor = theme.colors.onSurfaceVariant;
+
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: theme.colors.outlineVariant,
+        borderRadius: 12,
+        overflow: "hidden",
+        backgroundColor: theme.colors.surface,
+      }}
+    >
+      <View
+        className="flex-row items-center"
+        style={{
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.outlineVariant,
+        }}
+      >
+        <Text
+          className="text-sm font-medium flex-1"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
+          {t("table.title")}
+        </Text>
+        {hasData ? (
+          <>
+        <Pressable
+          onPress={() => {
+            void handleCopy();
+          }}
+          accessibilityLabel={t("menu.copy")}
+          accessibilityRole="button"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ padding: 6 }}
+        >
+          {copied ? (
+            <Check size={20} color={theme.colors.tertiary} />
+          ) : (
+            <Copy size={20} color={iconColor} />
+          )}
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            void handleDownload();
+          }}
+          accessibilityLabel={t("menu.share")}
+          accessibilityRole="button"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ padding: 6 }}
+        >
+          <Download size={20} color={iconColor} />
+        </Pressable>
+          </>
+        ) : null}
+        <Pressable
+          onPress={() => setFullOpen(true)}
+          accessibilityLabel={t("table.fullscreen")}
+          accessibilityRole="button"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ padding: 6 }}
+        >
+          <Maximize2 size={20} color={iconColor} />
+        </Pressable>
+      </View>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        directionalLockEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+      >
+        {children}
+      </ScrollView>
+      <Modal
+        visible={fullOpen}
+        animationType="slide"
+        onRequestClose={() => setFullOpen(false)}
+      >
+        <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
+          <View
+            className="flex-row items-center"
+            style={{ paddingVertical: 8, paddingHorizontal: 12 }}
+          >
+            <Text
+              className="text-base font-medium flex-1"
+              style={{ color: theme.colors.onSurface }}
+            >
+              {t("table.title")}
+            </Text>
+            <Pressable
+              onPress={() => setFullOpen(false)}
+              accessibilityLabel={t("common.close")}
+              accessibilityRole="button"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ padding: 6 }}
+            >
+              <X size={24} color={theme.colors.onSurface} />
+            </Pressable>
+          </View>
+          <ScrollView className="flex-1">
+            <ScrollView
+              horizontal
+              nestedScrollEnabled
+              directionalLockEnabled
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={16}
+            >
+              {children}
+            </ScrollView>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -494,13 +687,9 @@ export function MarkdownContent({
           />
         ),
         table: (node, children) => (
-          <ScrollView
-            key={node.key}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            <View style={styles.table}>{children}</View>
-          </ScrollView>
+          <TableCard key={node.key} node={node}>
+            {children}
+          </TableCard>
         ),
         bullet_list: (node, children) => (
           <React.Fragment key={node.key}>{children}</React.Fragment>

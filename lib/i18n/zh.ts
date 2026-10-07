@@ -3,6 +3,7 @@ import { Dict } from "./en";
 const zh: Dict = {
   common: {
     cancel: "取消",
+    close: "关闭",
     delete: "删除",
     retry: "重试",
     ok: "确定",
@@ -229,6 +230,10 @@ const zh: Dict = {
     shareFailed: "分享失败",
     speechFailed: "朗读失败",
     done: "完成",
+  },
+  table: {
+    title: "表格",
+    fullscreen: "全屏查看表格",
   },
   permission: {
     bash: "执行命令",
