@@ -2,7 +2,8 @@ import { randomUUID } from "expo-crypto";
 import { useState } from "react";
 
 import { createV2Client } from "@/lib/v2client";
-import { isSecureOrigin, normalizeOrigin, isPairConnectLink, parsePairLink, parseQrPayload, probeV2Session, redeemPairCode, QrPayload } from "@/lib/protocol";
+import { normalizeOrigin, isPairConnectLink, parsePairLink, parseQrPayload, probeV2Session, redeemPairCode, QrPayload } from "@/lib/protocol";
+import { classifyOrigin, hostOf, isTailscaleHost } from "@/lib/remotePolicy";
 import { useT } from "@/lib/i18n";
 import { saveDeviceToken } from "@/lib/secure";
 import { ConnectionMode, RemoteProvider, useAppStore } from "@/stores";
@@ -19,6 +20,10 @@ function translateError(message: string, t: TFn): string {
     )
   ) {
     return t("errors.noConnection");
+  }
+
+  if (/^\s*invalid url/i.test(message)) {
+    return t("errors.linkCode");
   }
 
   switch (message) {
@@ -42,6 +47,12 @@ function translateError(message: string, t: TFn): string {
       return t("errors.linkUsed");
     case "Server returned no session token":
       return t("errors.noToken");
+    case "LAN_REMOTE_MISMATCH":
+      return t("errors.lanRemoteMismatch");
+    case "REMOTE_LAN_MISMATCH":
+      return t("errors.remoteLanMismatch");
+    case "REMOTE_HTTPS_REQUIRED":
+      return t("errors.remoteHttpsRequired");
     case "Auth rejected (401) — re-pair this device":
       return t("diagDetail.authExpired");
     default:
@@ -52,6 +63,40 @@ function translateError(message: string, t: TFn): string {
 interface PairResult {
   serverId: string;
   origin: string;
+}
+
+/**
+ * Fail closed when the origin does not suit the pairing mode, so
+ * credentials never go to the wrong kind of network. Remote entries must
+ * additionally be HTTPS, except Tailscale overlay hosts whose transport
+ * is already encrypted.
+ */
+function enforceOriginMode(origin: string, mode: PairMode): void {
+  const cls = classifyOrigin(origin);
+
+  if (mode === "lan" && cls === "remote") {
+    throw new Error("LAN_REMOTE_MISMATCH");
+  }
+
+  if (mode === "remote" && cls !== "remote") {
+    throw new Error("REMOTE_LAN_MISMATCH");
+  }
+
+  if (mode === "remote" && cls === "remote") {
+    const host = hostOf(origin) ?? "";
+
+    let secure = false;
+
+    try {
+      secure = new URL(origin.trim()).protocol === "https:";
+    } catch {
+      secure = false;
+    }
+
+    if (!secure && !isTailscaleHost(host)) {
+      throw new Error("REMOTE_HTTPS_REQUIRED");
+    }
+  }
 }
 
 function extractFromLink(link: string): { origin: string; code: string } {
@@ -104,9 +149,7 @@ export function usePairing() {
     username?: string;
     password?: string;
   }): Promise<PairResult> => {
-    if (options.mode === "remote" && !isSecureOrigin(options.origin)) {
-      throw new Error(t("errors.httpsOnly"));
-    }
+    enforceOriginMode(options.origin, options.mode);
 
     const client = createV2Client({
       baseUrl: options.origin,
@@ -194,9 +237,7 @@ export function usePairing() {
   }): Promise<PairResult> => {
     const { origin } = parsePairLink(options.link);
 
-    if (options.mode === "remote" && !isSecureOrigin(origin)) {
-      throw new Error(t("errors.httpsOnly"));
-    }
+    enforceOriginMode(origin, options.mode);
 
     const token = await redeemPairCode(options.link);
     await probeV2Session(origin, "opencode", token);

@@ -18,6 +18,7 @@ import { useT } from "@/lib/i18n";
 import { isPairConnectLink, parseQrPayload } from "@/lib/protocol";
 import { useLanSweep } from "@/hooks/useLanSweep";
 import { usePairing } from "@/hooks/usePairing";
+import type { PairMode } from "@/hooks/usePairing";
 import { useAppStore } from "@/stores";
 
 type PairMethod = "qr" | "link" | "key";
@@ -28,14 +29,15 @@ const METHOD_TABS: { value: PairMethod; labelKey: string }[] = [
   { value: "key", labelKey: "pair.mKey" },
 ];
 
-// NOTE: remote connection modes (cloudflared / self-proxy) are not
-// implemented — every request goes straight to server.url (see usePairing).
-// Only LAN pairing is offered; the stored provider field stays for compat.
+// NOTE: only the "lan" provider tag exists because no tunnel is bundled:
+// remote entries carry a plain user-supplied origin (tunnel, VPS or
+// Tailscale) and are validated by enforceOriginMode in usePairing.
 
 export default function PairServerScreen() {
   const { t } = useT();
   const theme = useAppTheme();
   const [method, setMethod] = useState<PairMethod>("link");
+  const [mode, setMode] = useState<PairMode>("lan");
   const [customName, setCustomName] = useState("");
   const [qrJson, setQrJson] = useState("");
   const [link, setLink] = useState("");
@@ -99,7 +101,7 @@ export default function PairServerScreen() {
   };
 
   const runQrPair = async (content: string) => {
-    const result = await pairWithQr(content, customName, "lan", "lan");
+    const result = await pairWithQr(content, customName, mode, "lan");
 
     if (result) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -140,9 +142,9 @@ export default function PairServerScreen() {
       await runQrPair(qrJson);
       return;
     } else if (method === "link") {
-      result = await pairWithLink(link, customName, "lan", "lan");
+      result = await pairWithLink(link, customName, mode, "lan");
     } else {
-      result = await pairWithKey(origin, code, customName, "lan", "lan", {
+      result = await pairWithKey(origin, code, customName, mode, "lan", {
         username: pairUser,
         password: pairPass,
       });
@@ -167,6 +169,71 @@ export default function PairServerScreen() {
           >
             {t("pair.title")}
           </Text>
+
+          <Text
+            variant="labelLarge"
+            className="mb-2"
+          >
+            {t("pair.connection")}
+          </Text>
+          <View
+            className="flex-row"
+            style={{
+              backgroundColor: theme.colors.surfaceVariant,
+              borderRadius: 999,
+              padding: 4,
+              marginBottom: 12,
+              gap: 4,
+            }}
+            accessibilityRole="tablist"
+          >
+            {(
+              [
+                { value: "lan", labelKey: "pair.lan" },
+                { value: "remote", labelKey: "pair.remote" },
+              ] as { value: PairMode; labelKey: string }[]
+            ).map((tab) => {
+              const active = mode === tab.value;
+
+              return (
+                <Pressable
+                  key={tab.value}
+                  onPress={() => {
+                    setMode(tab.value);
+                    reset();
+                  }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  style={{
+                    flex: 1,
+                    alignItems: "center",
+                    paddingVertical: 10,
+                    borderRadius: 999,
+                    backgroundColor: active
+                      ? theme.colors.primary
+                      : "transparent",
+                  }}
+                >
+                  <Text
+                    className="text-sm"
+                    style={{
+                      color: active
+                        ? theme.colors.onPrimary
+                        : theme.colors.onSurfaceVariant,
+                      fontWeight: active ? "700" : "400",
+                    }}
+                  >
+                    {t(tab.labelKey)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {mode === "remote" && (
+            <HelperText type="info" visible={true} style={{ marginBottom: 8 }}>
+              {t("pair.remoteHint")}
+            </HelperText>
+          )}
 
           <Text
             variant="labelLarge"
