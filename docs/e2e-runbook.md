@@ -340,3 +340,10 @@ Q1/Q2 已随上轮验证；本轮跑 Q3（失败反馈链）＋Q6（MCP 联通�
 - 已验证的等价路径：同机 WiFi 下 `http://192.168.5.3:4097` 配对→prompt→红点→渲染全通（20261006-pairtabs binary）；Tailscale 只是把 underlay 从 WiFi 换成 WireGuard 加密网，App 走的代码路径完全一致。
 - 安全：tailnet 自带 WireGuard 加密，所以 HTTP origin 可接受（对标 dsh 的加密 overlay 立场）；不要把 0.0.0.0 的 serve 暴露在不可信局域网，配完即关或改绑指定 IP。
 - 已知限制：serve 密码随进程重建（重启服务要重配）；国内 Tailscale 直连质量看运营商，实在不行再谈自建 DERP/换 cloudflared（Phase 2）。
+
+### Tailscale 蜂窝实测通过（2026-10-07）
+
+- Mac/手机同 tailnet（100.119.137.121 / 100.91.248.81，DERP 中继约 200ms），serve 绑 0.0.0.0:4097。
+- 手机关 WiFi 纯流量：远程方式配 `http://macbook-pro.tail3f283c.ts.net:4097`（裸 100.x IP 会被策略拦，必须用 ts.net 域名）→ 可达。
+- 双向：服务端下发 `CELLULAR-OK` 手机可见；手机发“测试消息请回复收到”，服务端 3 秒内收到且 agent 回“收到”。
+- 用完即删会话、清目录、关 serve（0.0.0.0 常开等于裸奔局域网）。
