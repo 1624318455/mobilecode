@@ -479,7 +479,9 @@ function TableCard({
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
       >
-        {children}
+        <View>
+          {children}
+        </View>
       </ScrollView>
       <Modal
         visible={fullOpen}
@@ -515,7 +517,7 @@ function TableCard({
               showsHorizontalScrollIndicator={false}
               scrollEventThrottle={16}
             >
-              {children}
+              <View>{children}</View>
             </ScrollView>
           </ScrollView>
         </SafeAreaView>

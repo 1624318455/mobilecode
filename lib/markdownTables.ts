@@ -14,7 +14,9 @@ function nodeText(node: AstNode | null | undefined): string {
     return "";
   }
 
-  if (typeof node.content === "string") {
+  // Container nodes (table/tr/td/...) carry content: "" — only leaf text
+  // nodes have real content, so empty strings must fall through to children.
+  if (typeof node.content === "string" && node.content !== "") {
     return node.content;
   }
 
