@@ -349,17 +349,6 @@ function CodeBlock({
 }
 
 /**
- * Deterministic horizontal drag-to-scroll for tables.
- *
- * A bare nested ScrollView loses the gesture race too often (vertical
- * parent list + long-press bubble + MIUI touch filtering): swipes only
- * sometimes take, and overlay paging buttons occlude content. This wrapper
- * claims the responder exactly when the move is horizontally dominant and
- * then drives the inner ScrollView itself, so every qualifying drag moves
- * the table. Taps, vertical scrolls and the long-press menu are untouched:
- * the wrapper never claims those.
- */
-/**
  * DeepSeek-style table card: header (title + copy/download/fullscreen),
  * horizontally scrollable body without a scrollbar, and a fullscreen
  * viewer. Copy/download share TSV derived from the table AST (pure

@@ -1,7 +1,10 @@
 import { ChevronDown, ChevronUp, File, ScrollText } from "lucide-react-native";
 import { memo, useMemo, useState } from "react";
 import {
-  GestureResponderEvent,
+  LongPressGestureHandler,
+  State,
+} from "react-native-gesture-handler";
+import {
   Pressable,
   Text,
   View,
@@ -58,7 +61,7 @@ export const ChatMessagePart = memo(function ChatMessagePart({
     return splitCarriedText(part.text.trim());
   }, [isUser, part]);
 
-  function handleLongPress(e: GestureResponderEvent) {
+  function handleLongPressXY(x: number, y: number) {
     if (isUser || selectable) {
       return;
     }
@@ -66,8 +69,8 @@ export const ChatMessagePart = memo(function ChatMessagePart({
     onLongPressText?.({
       text: part.type === "text" ? (part.text ?? "") : "",
       partId: part.id,
-      x: e.nativeEvent.pageX,
-      y: e.nativeEvent.pageY,
+      x,
+      y,
     });
   }
 
@@ -167,18 +170,22 @@ export const ChatMessagePart = memo(function ChatMessagePart({
       return bubble;
     }
 
-    // Always yield the responder to a nested scroller: without this, the
-    // Pressable can keep swallowing horizontal moves (notably table/code
-    // ScrollViews), making them unscrollable while taps/long-press still
-    // work. Yielding is safe — long-press fires on its timer regardless.
+    // Long-press menu via the gesture-handler system (NOT a plain
+    // Pressable): on Android a Pressable ancestor can keep swallowing
+    // horizontal moves, starving nested table/code ScrollViews. The
+    // discrete LongPress handler coexists with scrolling children, and the
+    // 800ms floor keeps slow swipe direction-changes from opening the menu.
     return (
-      <Pressable
-        onLongPress={handleLongPress}
-        delayLongPress={800}
-        onResponderTerminationRequest={() => true}
+      <LongPressGestureHandler
+        onHandlerStateChange={({ nativeEvent }) => {
+          if (nativeEvent.state === State.ACTIVE) {
+            handleLongPressXY(nativeEvent.absoluteX, nativeEvent.absoluteY);
+          }
+        }}
+        minDurationMs={800}
       >
         {bubble}
-      </Pressable>
+      </LongPressGestureHandler>
     );
   }
 

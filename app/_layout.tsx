@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   DarkTheme,
   DefaultTheme,
@@ -111,6 +112,7 @@ function RootLayoutNav() {
 
   return (
     <StrictMode>
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
         <Material3ThemeProvider
           sourceColor="#0052FF"
@@ -173,6 +175,7 @@ function RootLayoutNav() {
           </QueryClientProvider>
         </Material3ThemeProvider>
       </KeyboardProvider>
+      </GestureHandlerRootView>
     </StrictMode>
   );
 }
