@@ -234,6 +234,7 @@ const ja: Dict = {
   table: {
     title: "テーブル",
     fullscreen: "全画面で見る",
+    rotate: "画面を回転",
   },
   permission: {
     bash: "コマンドを実行",
@@ -324,6 +325,7 @@ const ja: Dict = {
     deviceMenu: "デバイスオプション",
     sessionSettings: "セッション設定",
     questionClose: "質問を閉じる",
+    scrollLatest: "最新メッセージへ移動",
   },
   notFound: {
     title: "おっと！",

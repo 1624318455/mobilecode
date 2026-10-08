@@ -232,6 +232,7 @@ const en = {
   table: {
     title: "Table",
     fullscreen: "View table fullscreen",
+    rotate: "Rotate screen",
   },
   permission: {
     bash: "Run command",
@@ -323,6 +324,7 @@ const en = {
     deviceMenu: "Device options",
     sessionSettings: "Session settings",
     questionClose: "Dismiss question",
+    scrollLatest: "Jump to latest messages",
   },
   notFound: {
     title: "Oops!",

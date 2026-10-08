@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -53,6 +54,21 @@ function Dot({ delay }: { delay: number }) {
 }
 
 export function TypingDots() {
+  const reduceMotion = useReducedMotion();
+  const theme = useAppTheme();
+
+  if (reduceMotion) {
+    return (
+      <Text
+        className="text-base mt-6 px-2"
+        style={{ color: theme.colors.primary }}
+        accessibilityRole="progressbar"
+      >
+        …
+      </Text>
+    );
+  }
+
   return (
     <View className="flex-row items-center gap-1 mt-6 px-2">
       <Dot delay={0} />

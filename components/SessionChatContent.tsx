@@ -4,7 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { router, Stack, useFocusEffect } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { Check, Clock, Settings, Volume2, VolumeX } from "lucide-react-native";
+import { Check, ArrowDown, Clock, Settings, Volume2, VolumeX } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -18,7 +18,8 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, { Keyframe } from "react-native-reanimated";
+import * as ScreenOrientation from "expo-screen-orientation";
+import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
 
 import { ChatMessage } from "@/components/ChatMessage";
 import type { PartLongPress } from "@/components/ChatMessagePart";
@@ -185,6 +186,18 @@ export function SessionChatContent({
     }, [server.id, sessionId]),
   );
 
+  // app.config orientation is "default" (so the fullscreen table viewer
+  // can lock landscape): re-pin the chat to portrait on mount so physical
+  // rotation does not swing the conversation itself. The viewer re-locks
+  // on demand and restores portrait on close.
+  useEffect(() => {
+    void ScreenOrientation.lockAsync(
+      ScreenOrientation.OrientationLock.PORTRAIT_UP,
+    ).catch(() => {
+      // Lock unsupported (split-screen etc.): sensor rotation stays, harmless.
+    });
+  }, []);
+
   const {
     data: messages = [],
     isLoading,
@@ -299,6 +312,8 @@ export function SessionChatContent({
   const deltaBufRef = useRef<BufferedDelta[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const followRef = useRef(true);
+  const [following, setFollowing] = useState(true);
+  const reduceMotion = useReducedMotion();
   const [streamingIds, setStreamingIds] = useState<string[]>([]);
   // Bumped on every session-idle transition; drives auto-read (run fully
   // complete) without re-rendering the message flow itself.
@@ -989,39 +1004,25 @@ export function SessionChatContent({
     }
   }, [speech.error, t]);
 
-  const renderMessage = useCallback(
-    ({ item }: { item: (typeof sortedMessages)[number] }) => {
-      const node = (
-        <ChatMessage
-          message={item}
-          server={server}
-          pendingPermissions={pendingPermissions}
-        selectablePartId={selectablePartId}
-        onLongPressText={handleLongPressText}
-        isStreaming={
-          sessionActive && streamingIds.includes(item.info.id)
-        }
-        sessionActive={sessionActive}
-      />
-      );
 
-      if ((item as CachedMessage).optimistic) {
-        return <Animated.View entering={OptimisticEntering}>{node}</Animated.View>;
-      }
-
-      return node;
-    },
-    [server, pendingPermissions, selectablePartId, handleLongPressText, streamingIds, sessionActive],
-  );
 
   const handleChatScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       // Inverted list: offset 0 is the newest end. Only follow the stream
       // while pinned near it; reading history pauses auto-follow.
-      followRef.current = e.nativeEvent.contentOffset.y < 120;
+      // Scrolling back to the newest end resumes it (industry standard).
+      const near = e.nativeEvent.contentOffset.y < 120;
+      followRef.current = near;
+      setFollowing((prev) => (prev === near ? prev : near));
     },
     [],
   );
+
+  const jumpToLatest = useCallback(() => {
+    followRef.current = true;
+    setFollowing(true);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
 
   const latestUserMessage = sortedMessages.find((m) => m.info.role === "user");
   // v2 sessions carry the live agent/model selection (user messages do
@@ -1203,6 +1204,56 @@ export function SessionChatContent({
     [projectPath, sendMessageMutation, sessionId],
   );
 
+  const handleRetry = useCallback(() => {
+    const latest = [...sortedMessages]
+      .sort((a, b) => b.info.time.created - a.info.time.created)
+      .find((m) => m.info.role === "user");
+
+    const question = latest?.parts
+      .filter((p): p is Extract<ChatPart, { type: "text" }> => p.type === "text")
+      .map((p) => p.text)
+      .join("\n")
+      .trim();
+
+    if (question) {
+      handleSend(question, []);
+    }
+  }, [sortedMessages, handleSend]);
+
+  const renderMessage = useCallback(
+    ({ item }: { item: (typeof sortedMessages)[number] }) => {
+      const failed =
+        item.info.role === "assistant" &&
+        item.info.error != null &&
+        item.parts.length === 0;
+      const node = (
+        <ChatMessage
+          message={item}
+          server={server}
+          pendingPermissions={pendingPermissions}
+        selectablePartId={selectablePartId}
+        onLongPressText={handleLongPressText}
+        isStreaming={
+          sessionActive && streamingIds.includes(item.info.id)
+        }
+        sessionActive={sessionActive}
+        onRetry={failed && !sendMessageMutation.isPending ? handleRetry : undefined}
+      />
+      );
+
+      if ((item as CachedMessage).optimistic) {
+        if (reduceMotion) {
+          return node;
+        }
+
+        return <Animated.View entering={OptimisticEntering}>{node}</Animated.View>;
+      }
+
+      return node;
+    },
+    [server, pendingPermissions, selectablePartId, handleLongPressText, streamingIds, sessionActive, handleRetry, sendMessageMutation.isPending, reduceMotion],
+  );
+
   // Send-button stop: while the session is running the send key morphs
   // into a stop key (see MessageInput isBusy). No confirm — speed matters
   // mid-stream; a mistaken tap just stops a run the user can resume.
@@ -1242,7 +1293,7 @@ export function SessionChatContent({
               className="p-2"
               accessibilityLabel={t("sessionDrawer.title")}
               accessibilityRole="button"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <Clock size={24} color={theme.colors.primary} />
             </Pressable>
@@ -1256,7 +1307,7 @@ export function SessionChatContent({
                 className="p-2"
                 accessibilityLabel={t("a11y.autoRead")}
                 accessibilityRole="button"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 {autoRead ? (
                   <Volume2 size={24} color={theme.colors.primary} />
@@ -1275,7 +1326,7 @@ export function SessionChatContent({
                 className="p-2"
                 accessibilityLabel={t("a11y.sessionSettings")}
                 accessibilityRole="button"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <Settings size={24} color={theme.colors.primary} />
               </Pressable>
@@ -1305,6 +1356,12 @@ export function SessionChatContent({
               renderItem={renderMessage}
               onScroll={handleChatScroll}
               scrollEventThrottle={100}
+              keyboardShouldPersistTaps="handled"
+              windowSize={11}
+              maxToRenderPerBatch={10}
+              updateCellsBatchingPeriod={50}
+              initialNumToRender={12}
+              removeClippedSubviews={true}
               contentContainerStyle={{ padding: 16, flexGrow: 1 }}
               ListEmptyComponent={
                 isLoading ? (
@@ -1406,6 +1463,26 @@ export function SessionChatContent({
               stopping={abortMutation.isPending}
               onStop={() => abortMutation.mutate()}
             />
+            {!following && sortedMessages.length > 0 ? (
+              <Pressable
+                onPress={jumpToLatest}
+                className="absolute items-center justify-center"
+                style={{
+                  right: 16,
+                  bottom: 170,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: theme.colors.primary,
+                  elevation: 4,
+                }}
+                accessibilityLabel={t("a11y.scrollLatest")}
+                accessibilityRole="button"
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <ArrowDown size={24} color={theme.colors.onPrimary} />
+              </Pressable>
+            ) : null}
             {sendMessageMutation.error && (
               <Text
                 className="text-sm text-center px-4 pb-2"

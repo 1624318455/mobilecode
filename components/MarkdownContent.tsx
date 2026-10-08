@@ -1,20 +1,31 @@
 import * as Clipboard from "expo-clipboard";
 import {
   EncodingType,
+  StorageAccessFramework,
   cacheDirectory,
   writeAsStringAsync,
 } from "expo-file-system/legacy";
-import { Check, Copy, Download, Maximize2, X } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
+import { MaterialIcons } from "@expo/vector-icons";
+import * as ScreenOrientation from "expo-screen-orientation";
+import { shareAsync } from "expo-sharing";
+import {
+  Check,
+  ChevronLeft,
+  Copy,
+  Download,
+  Maximize2,
+} from "lucide-react-native";
 import MarkdownIt from "markdown-it";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Image,
   Linking,
   Modal,
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleProp,
   Text,
   View,
@@ -24,7 +35,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Markdown from "react-native-markdown-display";
 
 import { useAppTheme } from "@/components/Material3ThemeProvider";
-import { extractTableData, tableToTsv } from "@/lib/markdownTables";
+import { extractTableData, padTableRows, tableToTsv } from "@/lib/markdownTables";
 import { useT } from "@/lib/i18n";
 
 const baseFontSize = 15;
@@ -45,6 +56,7 @@ interface MdPalette {
   codeBorder: string;
   codeBorderWidth: number;
   divider: string;
+  headerBg: string;
 }
 
 function withAlpha(hex: string, alpha: number): string {
@@ -181,9 +193,13 @@ function buildMarkdownStyles(p: MdPalette) {
     tbody: {},
     th: {
       flex: 1,
+      flexBasis: 0,
       minWidth: 96,
       padding: 6,
       fontWeight: "bold" as const,
+      backgroundColor: p.headerBg,
+      borderLeftWidth: 1,
+      borderColor: p.divider,
     },
     tr: {
       borderBottomWidth: 1,
@@ -192,8 +208,11 @@ function buildMarkdownStyles(p: MdPalette) {
     },
     td: {
       flex: 1,
+      flexBasis: 0,
       minWidth: 96,
       padding: 6,
+      borderLeftWidth: 1,
+      borderColor: p.divider,
     },
     hr: {
       backgroundColor: p.divider,
@@ -244,6 +263,15 @@ const markdownItInstance = MarkdownIt({
   typographer: true,
   linkify: true,
 });
+
+const TSV_MIME = "text/tab-separated-values";
+
+function tableFileName(): string {
+  const d = new Date();
+  const p = (n: number): string => String(n).padStart(2, "0");
+
+  return `table-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.tsv`;
+}
 
 function handleLinkPress(url: string) {
   Linking.openURL(url);
@@ -315,7 +343,7 @@ function CodeBlock({
           className="px-2 py-1"
           accessibilityLabel={t("menu.copy")}
           accessibilityRole="button"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           <Text
             className="text-xs"
@@ -354,7 +382,15 @@ function CodeBlock({
  * viewer. Copy/download share TSV derived from the table AST (pure
  * functions, no render-phase side effects — a counter-based source
  * matcher poisoned React Compiler reconciliation and dropped body rows).
+ *
+ * Medium-mobile-table compliance (deliberate scope):
+ * - Never silently hide columns: header always shows "{n} cols", body
+ *   always scrolls horizontally, fullscreen keeps the same data path.
+ * - No sticky-first-column / >7-col card rewrite: RN has no stable
+ *   sticky-column API; dual-ScrollView sync would reintroduce the exact
+ *   ancestor-gesture regression just fixed. Fullscreen is the escape hatch.
  */
+const TABLE_TOUCH_PAD = 10;
 
 function TableCard({
   node,
@@ -366,9 +402,25 @@ function TableCard({
   const theme = useAppTheme();
   const { t } = useT();
   const [fullOpen, setFullOpen] = useState(false);
+  const [landscape, setLandscape] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rows = useMemo(() => extractTableData(node), [node]);
   const hasData = rows.some((r) => r.some((c) => c !== ""));
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+
+      if (savedTimerRef.current) {
+        clearTimeout(savedTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleCopy = async () => {
     const tsv = tableToTsv(rows);
@@ -378,23 +430,107 @@ function TableCard({
     }
 
     await Clipboard.setStringAsync(tsv);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
+
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+    }
+
+    copyTimerRef.current = setTimeout(() => {
+      setCopied(false);
+    }, 1500);
   };
 
+  // Android: save straight into the user's chosen directory via SAF
+  // (a share sheet over a private file:// URL is what failed before:
+  // target apps cannot read it). iOS: system share sheet, which natively
+  // offers Save to Files. Denied/cancelled SAF falls back to the sheet.
   const handleDownload = async () => {
     const tsv = tableToTsv(rows);
 
-    if (!tsv.trim() || !cacheDirectory) {
+    if (!tsv.trim()) {
       return;
     }
 
-    const uri = `${cacheDirectory}table-${Date.now()}.tsv`;
-    await writeAsStringAsync(uri, tsv, { encoding: EncodingType.UTF8 });
-    await Share.share({ url: uri });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      if (Platform.OS === "android") {
+        const perm =
+          await StorageAccessFramework.requestDirectoryPermissionsAsync();
+
+        if (perm.granted) {
+          // createFileAsync takes the name WITHOUT extension.
+          const name = tableFileName().replace(/\.tsv$/, "");
+          const fileUri = await StorageAccessFramework.createFileAsync(
+            perm.directoryUri,
+            name,
+            TSV_MIME,
+          );
+          await StorageAccessFramework.writeAsStringAsync(fileUri, tsv, {
+            encoding: EncodingType.UTF8,
+          });
+          void Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success,
+          );
+          setSaved(true);
+
+          if (savedTimerRef.current) {
+            clearTimeout(savedTimerRef.current);
+          }
+
+          savedTimerRef.current = setTimeout(() => {
+            setSaved(false);
+          }, 1500);
+
+          return;
+        }
+      }
+
+      if (!cacheDirectory) {
+        return;
+      }
+
+      const tmp = `${cacheDirectory}${tableFileName()}`;
+      await writeAsStringAsync(tmp, tsv, { encoding: EncodingType.UTF8 });
+      await shareAsync(tmp, { mimeType: TSV_MIME });
+    } catch {
+      Alert.alert(t("menu.share"), t("feedback.opFailed"));
+    }
   };
 
   const iconColor = theme.colors.onSurfaceVariant;
+
+  async function closeFullscreen(): Promise<void> {
+    setLandscape(false);
+    setFullOpen(false);
+
+    try {
+      await ScreenOrientation.lockAsync(
+        ScreenOrientation.OrientationLock.PORTRAIT_UP,
+      );
+    } catch {
+      // Lock unsupported here (split-screen etc.): physical rotation
+      // still works, and the chat re-locks on mount.
+    }
+  }
+
+  async function toggleRotation(): Promise<void> {
+    const next = !landscape;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      await ScreenOrientation.lockAsync(
+        next
+          ? ScreenOrientation.OrientationLock.LANDSCAPE
+          : ScreenOrientation.OrientationLock.PORTRAIT_UP,
+      );
+      setLandscape(next);
+    } catch {
+      Alert.alert(t("menu.share"), t("feedback.opFailed"));
+    }
+  }
 
   return (
     <View
@@ -413,6 +549,7 @@ function TableCard({
           paddingHorizontal: 12,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.outlineVariant,
+          backgroundColor: withAlpha(theme.colors.onSurface, 0.08),
         }}
       >
         <Text
@@ -429,8 +566,8 @@ function TableCard({
           }}
           accessibilityLabel={t("menu.copy")}
           accessibilityRole="button"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={{ padding: 6 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={{ padding: TABLE_TOUCH_PAD }}
         >
           {copied ? (
             <Check size={20} color={theme.colors.tertiary} />
@@ -444,10 +581,14 @@ function TableCard({
           }}
           accessibilityLabel={t("menu.share")}
           accessibilityRole="button"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={{ padding: 6 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={{ padding: TABLE_TOUCH_PAD }}
         >
-          <Download size={20} color={iconColor} />
+          {saved ? (
+            <Check size={20} color={theme.colors.tertiary} />
+          ) : (
+            <Download size={20} color={iconColor} />
+          )}
         </Pressable>
           </>
         ) : null}
@@ -455,8 +596,8 @@ function TableCard({
           onPress={() => setFullOpen(true)}
           accessibilityLabel={t("table.fullscreen")}
           accessibilityRole="button"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={{ padding: 6 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={{ padding: TABLE_TOUCH_PAD }}
         >
           <Maximize2 size={20} color={iconColor} />
         </Pressable>
@@ -475,27 +616,75 @@ function TableCard({
       <Modal
         visible={fullOpen}
         animationType="slide"
-        onRequestClose={() => setFullOpen(false)}
+        onRequestClose={() => {
+          void closeFullscreen();
+        }}
       >
         <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
           <View
             className="flex-row items-center"
-            style={{ paddingVertical: 8, paddingHorizontal: 12 }}
+            style={{ paddingVertical: 8, paddingHorizontal: 4 }}
           >
-            <Text
-              className="text-base font-medium flex-1"
-              style={{ color: theme.colors.onSurface }}
-            >
-              {t("table.title")}
-            </Text>
             <Pressable
-              onPress={() => setFullOpen(false)}
+              onPress={() => {
+                void closeFullscreen();
+              }}
               accessibilityLabel={t("common.close")}
               accessibilityRole="button"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={{ padding: 6 }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={{ padding: TABLE_TOUCH_PAD }}
             >
-              <X size={24} color={theme.colors.onSurface} />
+              <ChevronLeft size={24} color={theme.colors.onSurface} />
+            </Pressable>
+            <View className="flex-1" />
+            {hasData ? (
+              <>
+                <Pressable
+                  onPress={() => {
+                    void handleCopy();
+                  }}
+                  accessibilityLabel={t("menu.copy")}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  style={{ padding: TABLE_TOUCH_PAD }}
+                >
+                  {copied ? (
+                    <Check size={20} color={theme.colors.tertiary} />
+                  ) : (
+                    <Copy size={20} color={iconColor} />
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    void handleDownload();
+                  }}
+                  accessibilityLabel={t("menu.share")}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  style={{ padding: TABLE_TOUCH_PAD }}
+                >
+                  {saved ? (
+                    <Check size={20} color={theme.colors.tertiary} />
+                  ) : (
+                    <Download size={20} color={iconColor} />
+                  )}
+                </Pressable>
+              </>
+            ) : null}
+            <Pressable
+              onPress={() => {
+                void toggleRotation();
+              }}
+              accessibilityLabel={t("table.rotate")}
+              accessibilityRole="button"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={{ padding: TABLE_TOUCH_PAD }}
+            >
+              <MaterialIcons
+                name="screen-rotation"
+                size={22}
+                color={landscape ? theme.colors.primary : iconColor}
+              />
             </Pressable>
           </View>
           <ScrollView className="flex-1">
@@ -530,11 +719,16 @@ export function MarkdownContent({
 
   // markdown-it has no task-list plugin: rewrite `- [ ]` / `- [x]` into
   // glyphs before parsing so checklist items render instead of raw brackets.
+  // padTableRows normalizes ragged table rows (AI often drops trailing
+  // pipes) so every row carries the header's cell count — otherwise flex
+  // cells divide short rows among fewer items and columns misalign.
   const prepared = useMemo(
     () =>
-      content
-        .replace(/^- \[ \]/gm, "☐")
-        .replace(/^- \[[xX]\]/gm, "☑"),
+      padTableRows(
+        content
+          .replace(/^- \[ \]/gm, "☐")
+          .replace(/^- \[[xX]\]/gm, "☑"),
+      ),
     [content],
   );
 
@@ -555,6 +749,9 @@ export function MarkdownContent({
         codeBorder: withAlpha(onContainer, 0.2),
         codeBorderWidth: 0,
         divider: withAlpha(onContainer, 0.2),
+        // Neutral black-white gray in both modes: tinted tokens
+        // (surfaceContainer) read blue-purple, which is wrong here.
+        headerBg: withAlpha(theme.colors.onSurface, 0.08),
       });
     }
 
@@ -568,6 +765,7 @@ export function MarkdownContent({
       codeBorder: theme.colors.outlineVariant,
       codeBorderWidth: 1,
       divider: theme.colors.outlineVariant,
+      headerBg: withAlpha(theme.colors.onSurface, 0.08),
     });
   }, [isUser, theme]);
 

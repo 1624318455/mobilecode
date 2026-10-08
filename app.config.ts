@@ -9,7 +9,7 @@ const config: ExpoConfig = {
   name: IS_DEV ? "MobileCode Dev" : "MobileCode",
   slug: "mobilecode",
   version: "0.7",
-  orientation: "portrait",
+  orientation: "default",
   icon: "./assets/images/icon.png",
   scheme: "mobilecode",
   userInterfaceStyle: "automatic",

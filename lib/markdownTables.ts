@@ -68,3 +68,113 @@ export function tableToTsv(rows: string[][]): string {
 export function tableToCsv(rows: string[][]): string {
   return rows.map((r) => r.map(csvCell).join(",")).join("\n");
 }
+
+function splitPipeRow(line: string): string[] {
+  const kept: string[] = [];
+  let current = "";
+  let escaped = false;
+
+  for (const ch of line) {
+    if (escaped) {
+      current += ch;
+      escaped = false;
+    } else if (ch === "\\") {
+      current += ch;
+      escaped = true;
+    } else if (ch === "|") {
+      kept.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+
+  kept.push(current);
+  // Drop the empty segments outside the outer pipes.
+  if (kept.length > 0 && kept[0]?.trim() === "") {
+    kept.shift();
+  }
+
+  if (kept.length > 0 && kept[kept.length - 1]?.trim() === "") {
+    kept.pop();
+  }
+
+  return kept;
+}
+
+function isSeparatorRow(line: string): boolean {
+  const cells = splitPipeRow(line);
+
+  return (
+    cells.length > 0 &&
+    cells.every((c) => /^:?-+:?$/.test(c.trim()))
+  );
+}
+
+function padBlock(block: string[], width: number): string[] {
+  return block.map((line) => {
+    const cells = splitPipeRow(line);
+
+    if (cells.length >= width) {
+      return line;
+    }
+
+    if (isSeparatorRow(line)) {
+      return `|${[...cells.map((c) => c.trim() || "---"), ...Array<string>(width - cells.length).fill("---")].join("|")}|`;
+    }
+
+    return `|${[...cells, ...Array<string>(width - cells.length).fill("")].join("|")}|`;
+  });
+}
+
+/**
+ * Pad ragged markdown table rows (AI output often drops trailing pipes)
+ * so every row carries the header's cell count. Without this, flex cells
+ * divide each short row among fewer items and columns visibly misalign
+ * no matter what the cell styles do. Code fences are left untouched.
+ */
+export function padTableRows(markdown: string): string {
+  const lines = markdown.split("\n");
+  const out: string[] = [];
+  let block: string[] = [];
+  let fence = false;
+
+  function flush(): void {
+    if (block.length >= 2) {
+      const width = splitPipeRow(block[0] ?? "").length;
+
+      if (width > 0 && block.some((l) => isSeparatorRow(l))) {
+        out.push(...padBlock(block, width));
+        block = [];
+
+        return;
+      }
+    }
+
+    out.push(...block);
+    block = [];
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (/^(```|~~~)/.test(trimmed)) {
+      flush();
+      fence = !fence;
+      out.push(line);
+      continue;
+    }
+
+    if (!fence && /^\|/.test(line)) {
+      block.push(line);
+      continue;
+    }
+
+    flush();
+    out.push(line);
+  }
+
+  flush();
+
+  return out.join("\n");
+}

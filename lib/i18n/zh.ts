@@ -234,6 +234,7 @@ const zh: Dict = {
   table: {
     title: "表格",
     fullscreen: "全屏查看表格",
+    rotate: "旋转屏幕",
   },
   permission: {
     bash: "执行命令",
@@ -324,6 +325,7 @@ const zh: Dict = {
     deviceMenu: "设备选项",
     sessionSettings: "会话设置",
     questionClose: "关闭提问",
+    scrollLatest: "回到最新消息",
   },
   notFound: {
     title: "哎呀！",
